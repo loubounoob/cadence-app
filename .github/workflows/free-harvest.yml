@@ -2,7 +2,12 @@ name: Free harvest (Étage 1)
 
 on:
   schedule:
-    - cron: '17 */3 * * *'   # every 3 hours — cheap and steady, never a burst
+    # every 20 min — this now also drains on-demand tag requests queued by
+    # live searches (see /api/free-request + /api/free-tags), so the free
+    # tier keeps up with real demand instead of only refreshing a fixed
+    # curated list every few hours. Still a ~2min run, well inside GitHub's
+    # free Actions minutes at this frequency on a public repo.
+    - cron: '*/20 * * * *'
   workflow_dispatch: {}       # "Run workflow" button for a manual pass
 
 jobs:
