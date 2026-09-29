@@ -8,6 +8,7 @@ function fakeRedis(){
   const get=k=>{if(ex.has(k)&&ex.get(k)<Date.now()){s.delete(k);ex.delete(k)}return s.get(k)};
   const H=k=>{let v=get(k);if(!(v instanceof Map)){v=new Map();s.set(k,v)}return v};
   const L=k=>{let v=get(k);if(!Array.isArray(v)){v=[];s.set(k,v)}return v};
+  const Se=k=>{let v=get(k);if(!(v instanceof Set)){v=new Set();s.set(k,v)}return v};
   const run=([c,...a])=>{c=c.toUpperCase();
     switch(c){
       case 'GET':{const v=get(a[0]);return v===undefined?null:v}
@@ -25,6 +26,10 @@ function fakeRedis(){
       case 'LTRIM':{const l=L(a[0]);const st=+a[1],en=+a[2];s.set(a[0],l.slice(st,en+1));return 'OK'}
       case 'LRANGE':{const l=get(a[0])||[];return l.slice(+a[1],+a[2]+1)}
       case 'LLEN':{return (get(a[0])||[]).length}
+      case 'SADD':{const l=L(a[0]);let n=0;a.slice(1).forEach(v=>{v=String(v);if(!l.includes(v)){l.push(v);n++}});return n}
+      case 'SMEMBERS':{return (get(a[0])||[]).slice()}
+      case 'SCARD':{return (get(a[0])||[]).length}
+      case 'SPOP':{const l=L(a[0]);const n=a[1]!==undefined?Number(a[1]):1;const out=l.splice(0,n);return a[1]!==undefined?out:(out[0]??null)}
       default:throw new Error('fake redis: unsupported '+c)}};
   return {store:s,cmds:[],async handle(url,opts){
     const body=JSON.parse(opts.body);const isPipe=url.endsWith('/pipeline');

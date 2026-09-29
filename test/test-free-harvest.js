@@ -83,6 +83,37 @@ function fakeItem(over){
    const r=await t.call('free-pull',{query:{}});
    ok(r.status===400,'missing tag rejected');}
 
+  out.push('free-request — the app registering a hashtag it needs but found nothing pre-harvested for');
+  {const t=setup(FULL);
+   const r=await t.call('free-request',{method:'POST',body:{tag:'#Yoga_Relaxation!!'}});
+   ok(r.status===200&&r.json.queued===true,'registered ('+JSON.stringify(r.json)+')');
+   ok(t.redis.store.get('cadence:free:requested').includes('yoga_relaxation'),'stored sanitised, no #, lowercase');}
+  {const t=setup(FULL);
+   const r=await t.call('free-request',{method:'POST',body:{tag:''}});
+   ok(r.status===400,'empty tag rejected');}
+  {const t=setup({...FULL,CADENCE_ACCESS_CODE:'lille59'});
+   const r=await t.call('free-request',{method:'POST',body:{tag:'gymtok'}});
+   ok(r.status===401,'behind the same access code as free-pull');}
+  {const t=setup(FULL);
+   for(let i=0;i<205;i++)await t.call('free-request',{method:'POST',body:{tag:'tag'+i}});
+   const size=t.redis.store.get('cadence:free:requested').length;
+   ok(size<=200,'requested set stays capped even under a flood ('+size+')');}
+
+  out.push('free-tags — the outside harvester reading what live searches requested');
+  {const t=setup({...FULL,FREE_HARVEST_SECRET:'s3cr3t'});
+   await t.call('free-request',{method:'POST',body:{tag:'relaxationtok'}});
+   const r=await t.call('free-tags',{query:{secret:'s3cr3t'}});
+   ok(r.status===200&&r.json.tags.includes('relaxationtok'),'returns what was requested ('+JSON.stringify(r.json)+')');}
+  {const t=setup({...FULL,FREE_HARVEST_SECRET:'s3cr3t'});
+   const r=await t.call('free-tags',{query:{secret:'wrong'}});
+   ok(r.status===401,'wrong secret rejected — this route is harvester-facing, not browser-facing');}
+  {delete process.env.FREE_HARVEST_SECRET;const t=setup(FULL);
+   const r=await t.call('free-tags',{query:{secret:'anything'}});
+   ok(r.status===503,'no FREE_HARVEST_SECRET configured → refuses cleanly');}
+  {const t=setup({...FULL,FREE_HARVEST_SECRET:'s3cr3t'});
+   const r=await t.call('free-tags',{query:{secret:'s3cr3t'}});
+   ok(r.status===200&&Array.isArray(r.json.tags)&&r.json.tags.length===0,'nothing requested yet → empty list, not an error');}
+
   console.log(out.join('\n'));
   console.log(`\n${pass} passed, ${fail} failed`);
   if(fail)process.exit(1);
