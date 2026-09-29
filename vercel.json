@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/agent.js": { "maxDuration": 60 },
+    "api/ai.js": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/agent", "schedule": "0 7 * * *" }
+  ],
+  "headers": [
+    { "source": "/api/(.*)", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }
+  ]
+}
