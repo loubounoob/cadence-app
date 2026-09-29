@@ -13,7 +13,13 @@
                            Used only when REDIS_URL is absent.
      CADENCE_ACCESS_CODE  optional. When set, every call must carry it.
      DAILY_TOKEN_CAP      optional. Tokens per day across all calls (default 3,000,000).
-     CRON_SECRET          optional. Vercel sends it to the cron route. */
+     CRON_SECRET          optional. Vercel sends it to the cron route.
+     FREE_HARVEST_SECRET  optional. Required by /api/free-intake (Étage 1's
+                           free-collection harvester, see harvest/README.md).
+                           Without it, free-intake refuses every call and the
+                           discovery job simply falls back to the paid
+                           provider for every hashtag, as if free found
+                           nothing. */
 const redisTcp=require('./_redis');
 const MODEL='claude-sonnet-5';
 /* Two-tier model access: the browser can ask for a "tier" (never a raw model
