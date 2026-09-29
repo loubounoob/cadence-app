@@ -1,0 +1,19 @@
+name: Probe (TikTok sources)
+on:
+  workflow_dispatch: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright-core
+          npx playwright install --with-deps chromium
+      - name: Probe
+        run: node harvest/probe.mjs
