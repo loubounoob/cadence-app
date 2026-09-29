@@ -43,6 +43,20 @@ function loadTags(){
     return {hashtags:Array.isArray(cfg.hashtags)?cfg.hashtags:[],sounds:Array.isArray(cfg.sounds)?cfg.sounds:[]};
   }catch(e){console.error(`Could not read ${p}: ${e.message}. Add hashtags there (see harvest/tags.json.example).`);return {hashtags:[],sounds:[]}}}
 
+/* Whatever real searches asked for and found nothing pre-harvested (see
+   discovery.js's free-tier loop → /api/free-request) since the last run —
+   this is what turns the free tier from a fixed curated list into one that
+   widens itself to match actual demand. Best-effort: if the app is down or
+   this fails, the run just falls back to the static tags.json list. */
+async function loadRequestedTags(){
+  if(!CADENCE_URL||!SECRET)return [];
+  try{
+    const r=await fetch(`${CADENCE_URL}/api/free-tags?secret=${encodeURIComponent(SECRET)}`);
+    if(!r.ok)return [];
+    const j=await r.json();
+    return Array.isArray(j.tags)?j.tags:[];
+  }catch(e){return []}}
+
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const jitter=(base)=>base+Math.floor(Math.random()*base*0.4);
 
@@ -85,7 +99,12 @@ async function intake(tag,items){
 
 async function main(){
   if(!CADENCE_URL||!SECRET){console.error('CADENCE_URL and FREE_HARVEST_SECRET are required.');process.exit(1)}
-  const {hashtags,sounds}=loadTags();
+  const {hashtags:staticTags,sounds}=loadTags();
+  const requested=await loadRequestedTags();
+  if(requested.length)console.log(`${requested.length} on-demand tag(s) requested by live searches: ${requested.join(', ')}`);
+  // on-demand requests go first — they're what a real search is waiting on
+  // right now, the static list just fills the rest of this run's budget.
+  const hashtags=[...new Set([...requested,...staticTags])];
   if(!hashtags.length&&!sounds.length){console.error('No hashtags or sounds configured — nothing to do.');return}
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({
