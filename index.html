@@ -5543,6 +5543,17 @@ const DX_MAX_RUNNING=4, DX_PAGE=1000, DX_PAGES_PER_TICK=6, DX_SCORE_BATCH=40;
    model that costs the most only ever looks at the few hundred that matter. */
 const DX_TRIAGE_BATCH=40, DX_TRIAGE_MIN=42;   // permissive — Sonnet makes the real call
 const DX_DEEP_BATCH=15, DX_DEEPEN_MAX_POSTS=8; // smaller batches, richer prompt
+/* ── Étage 1: free collection ────────────────────────────────────────────
+   Before paying the provider by the row, every hashtag/sound in the plan
+   first gets a cheap poll against /api/free-pull — rows an outside
+   harvester (harvest/free-harvest.mjs, run for free on GitHub Actions)
+   already queued from TikTok's own public hashtag and sound pages, the
+   same "UGC tagged with this tag" content Creative Center points at, read
+   at $0 provider cost. Whatever a hashtag doesn't get for free, the
+   existing paid runs below still cover in full — this tier only ever
+   *reduces* how much of that paid capacity actually gets used, it never
+   gates or delays the harvest. */
+const DX_FREE_PULL=500, DX_FREE_MAX_TICKS=6;
 const MARKET_LANG={US:'en',GB:'en',CA:'en',AU:'en',IE:'en',NZ:'en',FR:'fr',BE:'fr',DE:'de',AT:'de',ES:'es',MX:'es',BR:'pt',PT:'pt',IT:'it',NL:'nl'};
 
 AGENTS.scout={name:'Scout',role:'Plans creator searches and gives the final, strict verdict on shortlisted creators',
@@ -5616,6 +5627,8 @@ const DX_OFF={shouldDownloadVideos:false,shouldDownloadCovers:false,shouldDownlo
 function dxMakeRuns(plan,per,market){
   const runs=[],co=(market||'').toUpperCase();
   const px=co?{proxyCountryCode:co}:{};
+  // Étage 1 — one free poll per hashtag, ahead of every paid run below.
+  for(const tag of plan.hashtags)runs.push({key:'free'+tag,kind:'free',tag,label:'#'+tag+' (free)',status:'PENDING',offset:0,rows:0,ticks:0});
   for(let i=0;i<plan.hashtags.length;i+=8){const tags=plan.hashtags.slice(i,i+8);
     runs.push({key:'h'+i,kind:'hashtags',label:tags.join(', '),max:tags.length*per,
       input:{hashtags:tags,resultsPerPage:per,...DX_OFF,...px},status:'PENDING',offset:0,rows:0})}
@@ -5632,7 +5645,7 @@ function dxNewJob(brief,market,plan){
        including the handful that land past the target before a run finishes
        aborting — quality means nothing collected goes unjudged. */
     scoreMax:Number.MAX_SAFE_INTEGER,plan,per:b.perUnit,estimate:b,runs:dxMakeRuns(plan,b.perUnit,market),status:'planned',
-    stats:{rows:0,seen:0,kept:0,added:0,outBand:0,wrongLang:0,negative:0,triaged:0,triageRejected:0,scored:0,scoreErr:0},
+    stats:{rows:0,free:0,seen:0,kept:0,added:0,outBand:0,wrongLang:0,negative:0,triaged:0,triageRejected:0,scored:0,scoreErr:0},
     toDeep:[],createdAt:new Date().toISOString(),log:[]};
   save();return c.job}
 function dxLog(j,m){j.log=[{at:new Date().toISOString(),m},...(j.log||[])].slice(0,40)}
@@ -5659,15 +5672,30 @@ async function dxTick(){
        gates the harvest-specific parts (target-reached abort, handoff to
        scoring) below. */
     if(j.status==='running'||j.runs.some(r=>r.status==='PENDING'||(r.id&&!r.collected))){
-      // start runs, a few at a time
-      const active=j.runs.filter(r=>['READY','RUNNING'].includes(r.status)).length;
-      for(const r of j.runs.filter(r=>r.status==='PENDING').slice(0,Math.max(0,DX_MAX_RUNNING-active))){
+      // Étage 1 — free tier first: one cheap GET per hashtag against whatever
+      // the outside harvester already queued, no provider run to start, no
+      // concurrency slot used. Best-effort: any failure here just leaves
+      // that hashtag to the paid run below, it never breaks the harvest.
+      for(const r of j.runs.filter(r=>r.kind==='free'&&!r.collected)){
+        r.ticks=(r.ticks||0)+1;
+        try{
+          const resp=await apiFetch(`/api/free-pull?tag=${encodeURIComponent(r.tag)}&limit=${DX_FREE_PULL}`);
+          const d=await resp.json();
+          const items=(d&&Array.isArray(d.items))?d.items:[];
+          if(items.length){await dxIngest(j,items,{kind:'hashtags',label:'#'+r.tag});r.rows+=items.length;j.stats.free+=items.length}
+          if(!d||!d.more)r.collected=true}
+        catch(e){r.collected=true}
+        if(r.ticks>=DX_FREE_MAX_TICKS)r.collected=true;
+        if(j.status==='running'&&j.stats.kept>=j.target)break}
+      // start runs, a few at a time (paid provider only)
+      const active=j.runs.filter(r=>r.kind!=='free'&&['READY','RUNNING'].includes(r.status)).length;
+      for(const r of j.runs.filter(r=>r.kind!=='free'&&r.status==='PENDING').slice(0,Math.max(0,DX_MAX_RUNNING-active))){
         try{const d=(await apify(`/acts/${encodeURIComponent(actorFor('tiktok'))}/runs?maxItems=${r.max}&timeout=3600`,
             {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r.input)})).data;
           r.id=d.id;r.ds=d.defaultDatasetId;r.status=d.status||'READY';dxLog(j,'Started '+r.label.slice(0,60))}
         catch(e){r.status='FAILED';r.err=e.message;dxLog(j,'Could not start: '+e.message.slice(0,120))}}
       // collect from every started run, even while it is still running
-      for(const r of j.runs.filter(r=>r.id&&!r.collected)){
+      for(const r of j.runs.filter(r=>r.kind!=='free'&&r.id&&!r.collected)){
         try{const d=(await apify(`/actor-runs/${r.id}`)).data;r.status=d.status;r.ds=r.ds||d.defaultDatasetId}catch(e){}
         let pages=0;
         while(pages<DX_PAGES_PER_TICK){
@@ -5684,14 +5712,15 @@ async function dxTick(){
       // harvest-only bookkeeping: reaching the target, and handing off to triage
       if(j.status==='running'){
         if(j.stats.kept>=j.target){
-          for(const r of j.runs.filter(r=>['READY','RUNNING'].includes(r.status))){
+          for(const r of j.runs.filter(r=>r.kind!=='free'&&['READY','RUNNING'].includes(r.status))){
             try{await apify(`/actor-runs/${r.id}/abort`,{method:'POST'})}catch(e){}r.status='ABORTED';r.collected=true}
-          j.runs.filter(r=>r.status==='PENDING').forEach(r=>{r.status='SKIPPED';r.collected=true});
-          dxLog(j,`Target reached — ${num(j.stats.kept)} creators. Remaining runs stopped.`)}
+          j.runs.filter(r=>r.kind!=='free'&&r.status==='PENDING').forEach(r=>{r.status='SKIPPED';r.collected=true});
+          j.runs.filter(r=>r.kind==='free'&&!r.collected).forEach(r=>{r.collected=true});
+          dxLog(j,`Target reached — ${num(j.stats.kept)} creators${j.stats.free?` (${num(j.stats.free)} free)`:''}. Remaining runs stopped.`)}
         const open=j.runs.filter(r=>!r.collected&&!['FAILED','SKIPPED'].includes(r.status));
         if(!open.length){j.status='scoring';j.collectedAt=new Date().toISOString();
-          dxLog(j,`Harvest done — ${num(j.stats.rows)} posts read, ${num(j.stats.kept)} creators kept.`);
-          emit('discovery_harvested',{job:j.id,rows:j.stats.rows,kept:j.stats.kept,added:j.stats.added,cost_usd:+(j.stats.rows*DX_ROW_COST).toFixed(2)})}}
+          dxLog(j,`Harvest done — ${num(j.stats.rows+j.stats.free)} posts read (${num(j.stats.free)} free), ${num(j.stats.kept)} creators kept.`);
+          emit('discovery_harvested',{job:j.id,rows:j.stats.rows,free:j.stats.free,kept:j.stats.kept,added:j.stats.added,cost_usd:+(j.stats.rows*DX_ROW_COST).toFixed(2)})}}
     }
     if(j.status==='scoring'){
       /* Scoring must never finish silently at 0 just because the AI backend
@@ -5991,8 +6020,9 @@ async function dxWriteDeepScores(j,results){
     t.oncomplete=res;t.onerror=()=>rej(t.error)}).catch(e=>{dxLog(j,'Writing deep scores failed: '+e.message.slice(0,120))})}
 
 async function dxStop(){const j=dxJob();if(!j)return;
-  for(const r of j.runs.filter(r=>['READY','RUNNING'].includes(r.status))){try{await apify(`/actor-runs/${r.id}/abort`,{method:'POST'})}catch(e){}r.status='ABORTED';r.collected=true}
-  j.runs.filter(r=>r.status==='PENDING').forEach(r=>{r.status='SKIPPED';r.collected=true});
+  for(const r of j.runs.filter(r=>r.kind!=='free'&&['READY','RUNNING'].includes(r.status))){try{await apify(`/actor-runs/${r.id}/abort`,{method:'POST'})}catch(e){}r.status='ABORTED';r.collected=true}
+  j.runs.filter(r=>r.kind!=='free'&&r.status==='PENDING').forEach(r=>{r.status='SKIPPED';r.collected=true});
+  j.runs.filter(r=>r.kind==='free'&&!r.collected).forEach(r=>{r.collected=true});
   j.status='scoring';dxLog(j,'Stopped by you — triaging what was collected.');save();dxStartLoop();dxRenderJob()}
 function dxPause(){const j=dxJob();if(!j)return;j.pausedFrom=j.status;j.status='paused';dxLog(j,'Paused');save();dxStopLoop();dxRenderJob()}
 function dxResume(){const j=dxJob();if(!j)return;j.status=j.pausedFrom||'running';dxLog(j,'Resumed');save();dxStartLoop();dxTick();dxRenderJob()}
@@ -6005,7 +6035,7 @@ function dxPanel(){
   return `<div class="card">
     <div class="sh" style="margin-bottom:12px"><h2 style="font-size:19px">Find TikTok creators at scale</h2>
       <span class="pill ${ready?'g':''}">${ready?'Provider connected':'No provider token'}</span></div>
-    <div class="cd" style="margin-bottom:14px">Describe who you want — including any tone or values a creator must (or must not) reflect. The AI plans the hashtags, the provider harvests them, then every creator collected gets a fast first pass; only the plausible ones get a slower, stricter final read before anything reaches the list. Nothing unqualified ever gets there, and nothing is padded to hit a number.</div>
+    <div class="cd" style="margin-bottom:14px">Describe who you want — including any tone or values a creator must (or must not) reflect. The AI plans the hashtags; every one is tried free first (real TikTok hashtag/sound pages, $0 per row) and only tops up with the paid provider for what the free tier didn't find. Every creator collected then gets a fast first pass; only the plausible ones get a slower, stricter final read before anything reaches the list. Nothing unqualified ever gets there, and nothing is padded to hit a number.</div>
     ${active?'':`
     <div class="fg"><label>Who are you looking for?</label>
       <textarea id="dx-b" style="min-height:70px" placeholder="Women doing gym and home workouts, sharing routines and what they eat — relatable, not pro athletes. No alcohol or gambling content, family-friendly tone only.">${esc(c.brief||'')}</textarea></div>
@@ -6060,7 +6090,7 @@ function dxPlanView(){
     <div class="fg"><label>Video searches</label><textarea id="dx-q" style="min-height:60px">${esc(p.queries.join('\n'))}</textarea></div>
     ${p.negative&&p.negative.length?`<div class="hd" style="margin-bottom:10px">Excluded words: ${esc(p.negative.join(', '))}</div>`:''}
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <span>Estimated provider cost <b>$${b.cost.toFixed(2)}</b> at most — it stops as soon as ${num(c.target)} creators are found.</span>
+      <span>Estimated provider cost <b>$${b.cost.toFixed(2)}</b> at most — it stops as soon as ${num(c.target)} creators are found. Every hashtag is tried free first; this is the ceiling if the free tier finds nothing, not the typical cost.</span>
       <div style="display:flex;gap:8px"><button class="btn gh" onclick="dxPlanDraft=null;renderDisc()">Cancel</button>
       <button class="btn p" onclick="dxGo()">Launch</button></div></div></div>`}
 function dxGo(){
@@ -6087,7 +6117,7 @@ function dxJobView(j){
     <div class="bar"><i style="width:${pct}%"></i></div>
     <div class="pgrid" style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
       <div class="pc"><div class="t">Creators kept</div><div class="big">${num(s.kept)}</div><div class="sm2">of ${num(j.target)} wanted · ${num(s.added)} new to your index</div></div>
-      <div class="pc"><div class="t">Posts read</div><div class="big">${num(s.rows)}</div><div class="sm2">${fin}/${runs.length} runs finished · $${cost.toFixed(2)} so far</div></div>
+      <div class="pc"><div class="t">Posts read</div><div class="big">${num(s.rows+(s.free||0))}</div><div class="sm2">${fin}/${runs.length} runs finished · ${num(s.free||0)} free · $${cost.toFixed(2)} so far</div></div>
       <div class="pc"><div class="t">Triaged · Haiku</div><div class="big">${num(s.triaged)}</div><div class="sm2">of ${num(s.kept)} kept · ${num(s.triageRejected||0)} ruled out${s.scoreErr?` · ${s.scoreErr} batch errors`:''}${aiReady()?'':' · AI offline'}</div></div>
       <div class="pc"><div class="t">Deep-reviewed · Sonnet</div><div class="big">${num(s.scored)}</div><div class="sm2">${toDeepLeft?`${num(toDeepLeft)} left in queue`:'shortlist only — the strictest pass'}</div></div>
     </div>
