@@ -173,7 +173,14 @@ async function dxTick(){
           const d=await resp.json();
           const items=(d&&Array.isArray(d.items))?d.items:[];
           if(items.length){await dxIngest(j,items,{kind:'hashtags',label:'#'+r.tag});r.rows+=items.length;j.stats.free+=items.length}
-          if(!d||!d.more)r.collected=true}
+          if(!d||!d.more){
+            r.collected=true;
+            // nothing pre-harvested for this tag at all — ask the outside
+            // harvester to pick it up on its next pass (see /api/free-request),
+            // so a search's own hashtags widen free coverage over time instead
+            // of only ever working the fixed list in harvest/tags.json.
+            if(!r.rows)apiFetch('/api/free-request',{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({tag:r.tag})}).catch(()=>{})}}
         catch(e){r.collected=true}
         if(r.ticks>=DX_FREE_MAX_TICKS)r.collected=true;
         if(j.status==='running'&&j.stats.kept>=j.target)break}
@@ -182,8 +189,8 @@ async function dxTick(){
       for(const r of j.runs.filter(r=>r.kind!=='free'&&r.status==='PENDING').slice(0,Math.max(0,DX_MAX_RUNNING-active))){
         try{const d=(await apify(`/acts/${encodeURIComponent(actorFor('tiktok'))}/runs?maxItems=${r.max}&timeout=3600`,
             {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r.input)})).data;
-          r.id=d.id;r.ds=d.defaultDatasetId;r.status=d.status||'READY';dxLog(j,'Started '+r.label.slice(0,60))}
-        catch(e){r.status='FAILED';r.err=e.message;dxLog(j,'Could not start: '+e.message.slice(0,120))}}
+          r.id=d.id;r.ds=d.defaultDatasetId;r.status=d.status||'READY';j.providerErr=null;dxLog(j,'Started '+r.label.slice(0,60))}
+        catch(e){r.status='FAILED';r.err=e.message;j.providerErr=e.message;dxLog(j,'Could not start: '+e.message.slice(0,120))}}
       // collect from every started run, even while it is still running
       for(const r of j.runs.filter(r=>r.kind!=='free'&&r.id&&!r.collected)){
         try{const d=(await apify(`/actor-runs/${r.id}`)).data;r.status=d.status;r.ds=r.ds||d.defaultDatasetId}catch(e){}
@@ -605,6 +612,7 @@ function dxJobView(j){
           ${j.listId?`<button class="btn sm p" onclick="show('lists');openList='${j.listId}';renderLists()">View saved list</button>`:''}
           <button class="btn sm gh" onclick="dxCfg().job=null;save();renderDisc()">New search</button>`:''}</div></div>
     <div class="bar"><i style="width:${pct}%"></i></div>
+    ${j.providerErr&&!s.rows?`<div class="hd" style="color:var(--danger,#c0392b);margin:8px 0;padding:8px 10px;border:1px solid currentColor;border-radius:8px">Paid provider unavailable — every paid run failed to start: ${esc(String(j.providerErr).replace(/\s+/g,' ').slice(0,180))}${s.free?` Free tier still found ${num(s.free)} post(s).`:' Free tier found nothing for these hashtags yet either — they have been queued for the next free harvest pass (up to ~20 min).'}</div>`:''}
     <div class="pgrid" style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
       <div class="pc"><div class="t">Creators kept</div><div class="big">${num(s.kept)}</div><div class="sm2">of ${num(j.target)} wanted · ${num(s.added)} new to your index</div></div>
       <div class="pc"><div class="t">Posts read</div><div class="big">${num(s.rows+(s.free||0))}</div><div class="sm2">${fin}/${runs.length} runs finished · ${num(s.free||0)} free · $${cost.toFixed(2)} so far</div></div>
