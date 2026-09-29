@@ -1,0 +1,34 @@
+name: Creator research worker
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # picks up new or resumable research jobs
+  workflow_dispatch: {}       # started instantly by the app when GH_DISPATCH_TOKEN is set
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Anything to do?
+        id: peek
+        env:
+          CADENCE_URL: ${{ secrets.CADENCE_URL }}
+          FREE_HARVEST_SECRET: ${{ secrets.FREE_HARVEST_SECRET }}
+        run: node harvest/research-peek.mjs
+      - name: Install Playwright
+        if: steps.peek.outputs.work == 'true'
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright-core
+          npx playwright install --with-deps chromium
+      - name: Research
+        if: steps.peek.outputs.work == 'true'
+        env:
+          CADENCE_URL: ${{ secrets.CADENCE_URL }}
+          FREE_HARVEST_SECRET: ${{ secrets.FREE_HARVEST_SECRET }}
+        run: node harvest/research-worker.mjs
