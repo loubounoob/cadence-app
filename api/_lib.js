@@ -19,7 +19,12 @@
                            Without it, free-intake refuses every call and the
                            discovery job simply falls back to the paid
                            provider for every hashtag, as if free found
-                           nothing. */
+                           nothing. Also authenticates the deep-research
+                           worker against /api/research (x-worker-secret).
+     RESEARCH_TOKEN_CAP   optional. Tokens/day for the research worker (default 40,000,000).
+     GH_DISPATCH_TOKEN    optional. A GitHub token allowed to run workflows on
+                           this repo: a new research job then starts at once
+                           instead of on the worker's next scheduled poll. */
 const redisTcp=require('./_redis');
 const MODEL='claude-sonnet-5';
 /* Two-tier model access: the browser can ask for a "tier" (never a raw model
@@ -85,20 +90,26 @@ function hgetallObj(flat){const o={};if(!Array.isArray(flat))return o;
 /* ── Anthropic: the only place the key is read. Model is forced. ───────── */
 const ALLOWED=['system','messages','tools','tool_choice','max_tokens','temperature','stop_sequences'];
 function today(){return new Date().toISOString().slice(0,10)}
-async function capCheck(){
+/* Budgets: the app's own calls share DAILY_TOKEN_CAP under "usage:"; the
+   research worker (api/research.js) meters separately under "rsusage:"
+   with RESEARCH_TOKEN_CAP, so a long deep search can never starve the
+   inbox/outreach agent, and vice versa. */
+async function capCheck(b){
   if(!kv.ok)return null;
-  const cap=Number(process.env.DAILY_TOKEN_CAP)||3000000;
-  const used=Number(await kv.cmd('GET',K('usage:'+today())))||0;
+  const pre=(b&&b.prefix)||'usage:';
+  const cap=(b&&b.cap)||Number(process.env.DAILY_TOKEN_CAP)||3000000;
+  const used=Number(await kv.cmd('GET',K(pre+today())))||0;
   return used>=cap?{used,cap}:null}
-async function capAdd(u){
+async function capAdd(u,b){
   if(!kv.ok||!u)return;
+  const pre=(b&&b.prefix)||'usage:';
   const n=(u.input_tokens||0)+(u.output_tokens||0);if(!n)return;
-  await kv.pipe([['INCRBY',K('usage:'+today()),String(n)],['EXPIRE',K('usage:'+today()),String(3*86400)]])}
+  await kv.pipe([['INCRBY',K(pre+today()),String(n)],['EXPIRE',K(pre+today()),String(3*86400)]])}
 
-async function anthropic(payload){
+async function anthropic(payload,budget){
   const key=process.env.ANTHROPIC_API_KEY;
   if(!key)return {status:503,json:{error:{type:'no_key',message:'ANTHROPIC_API_KEY is not set on the server.'}}};
-  const over=await capCheck().catch(()=>null);
+  const over=await capCheck(budget).catch(()=>null);
   if(over)return {status:429,json:{error:{type:'daily_cap',message:`Daily AI budget reached (${over.used.toLocaleString('en-US')} tokens). It resets at midnight UTC.`}}};
   const req={};for(const k of ALLOWED)if(payload[k]!==undefined)req[k]=payload[k];
   req.model=MODELS[payload.tier]||MODELS.sonnet;
@@ -107,7 +118,7 @@ async function anthropic(payload){
   const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
     headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},body:JSON.stringify(req)});
   let j;try{j=await r.json()}catch(e){j={error:{type:'bad_gateway',message:'Unreadable answer from Anthropic'}}}
-  if(r.ok)await capAdd(j.usage).catch(()=>{});
+  if(r.ok)await capAdd(j.usage,budget).catch(()=>{});
   return {status:r.status,json:j,retryAfter:r.headers.get('retry-after')}}
 
 module.exports={MODEL,MODELS,cors,send,gate,body,kv,K,hgetallObj,anthropic,today};
