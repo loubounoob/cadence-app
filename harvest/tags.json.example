@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy this to harvest/tags.json and edit it. Hashtags: whatever discovery.js's own AI plan (dxPlan) is currently using for a live search — the app's Search plan screen shows the exact list, edit it there or paste the same tags here. Sounds: curated by hand for now (id from a TikTok music page URL, e.g. tiktok.com/music/Original-Sound-7123456789012345678 → id 7123456789012345678) — Creative Center's trending-sound list needs a logged-in session to read in full, so this starts manual and can grow once that's wired up.",
+  "hashtags": ["gymtok", "homeworkout", "gymgirl", "whatieatinaday", "fitnessmotivation"],
+  "sounds": []
+}
