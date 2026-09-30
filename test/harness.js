@@ -29,6 +29,10 @@ function fakeRedis(){
       case 'RPUSH':{const l=L(a[0]);a.slice(1).forEach(v=>l.push(String(v)));return l.length}
       case 'HMGET':{const h=get(a[0]);return a.slice(1).map(f=>h instanceof Map&&h.has(f)?h.get(f):null)}
       case 'HEXISTS':{const h=get(a[0]);return h instanceof Map&&h.has(a[1])?1:0}
+      case 'ZADD':{let z=get(a[0]);if(!(z instanceof Map)||z.__z!==1){z=new Map();z.__z=1;s.set(a[0],z)}let n=0;for(let i=1;i<a.length;i+=2){if(!z.has(a[i+1]))n++;z.set(String(a[i+1]),Number(a[i]))}return n}
+      case 'ZCARD':{const z=get(a[0]);return z instanceof Map?z.size:0}
+      case 'ZPOPMAX':{const z=get(a[0]);if(!(z instanceof Map))return [];const n=Number(a[1]||1);const top=[...z.entries()].sort((x,y)=>y[1]-x[1]).slice(0,n);const out=[];top.forEach(([m,sc])=>{z.delete(m);out.push(m,String(sc))});return out}
+      case 'HSCAN':{const h=get(a[0]);if(!(h instanceof Map))return ['0',[]];const cur=Number(a[1])||0,cnt=Number(a[a.indexOf('COUNT')+1])||10;const e=[...h.entries()];const part=e.slice(cur,cur+cnt);return [String(cur+cnt>=e.length?0:cur+cnt),part.flat()]}
       case 'SADD':{const l=L(a[0]);let n=0;a.slice(1).forEach(v=>{v=String(v);if(!l.includes(v)){l.push(v);n++}});return n}
       case 'SMEMBERS':{return (get(a[0])||[]).slice()}
       case 'SCARD':{return (get(a[0])||[]).length}

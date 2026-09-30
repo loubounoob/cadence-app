@@ -102,7 +102,46 @@ out.push('resilience');
  const u={input_tokens:1000000,output_tokens:100000};C.meter(s3,'haiku',u);
  ok(s3.stats.costUsd===1.5,'cost metered per tier ($'+s3.stats.costUsd+')');
  ok(C.extractLinks('<a href="https://instagram.com/hts">x</a><a href="https://www.instagram.com/alice.lifts/">y</a>').instagram==='@alice.lifts','junk Instagram paths ignored');
+ ok(C.parseJSON('{"results":[{"h":"a","fit":80},{"h":"b","fi').results[0].fit===80,'truncated answer: complete elements kept');
+ ok(C.applyPlan(C.newState(brief),brief,{hashtags:'gymtok:80 legday:60 musculation'})===2,'compact tag:pri plan format parsed');
  ok(C.parseJSON('noise {"a":1} tail').a===1,'JSON extracted from a chatty answer');}
+
+out.push('cheaper: free checks before any vetting call');
+{const fr=C.detectLang('je fais ma séance de musculation avec mon coach et on travaille les jambes pour la prise de masse cette semaine dans la salle avec tous les potes');
+ const de=C.detectLang('heute ist beintag und ich zeige dir mein training für den muskelaufbau mit der richtigen technik nicht vergessen');
+ ok(fr.lang==='fr'&&de.lang==='de','language guessed from captions for free ('+fr.lang+','+de.lang+')');
+ ok(C.detectLang('#gymtok #fyp 💪').lang==='','too little text → no guess, never a false reject');
+ const b=C.normBrief({niche_summary:'x',languages:['fr'],followers:{min:5000,max:500000}});
+ const base={...d,m:{...d.m,sampled:10}};
+ ok(C.dossierGate(b,{...base,videos:base.videos.map(v=>({...v,desc:'heute ist beintag und ich zeige dir mein training für den muskelaufbau mit der richtigen technik'}))}).startsWith('language'),'off-market creator dropped before vetting');
+ ok(C.dossierGate(b,{...base,m:{...base.m,medViews:100,followers:20000}})==='low reach vs followers','dead audience dropped before vetting');
+ ok(C.dossierGate(b,{...base,m:{...base.m,engagementRate:0.4}})==='low engagement','weak engagement dropped before vetting');
+ ok(C.dossierGate(b,{...base,m:{...base.m,sponsoredShare:0.9}})==='mostly sponsored content','ad-only account dropped before vetting');
+ ok(C.dossierGate(C.normBrief({niche_summary:'x',min_engagement:0,min_views_ratio:0,max_sponsored:1,strict_language:false}),{...base,m:{...base.m,engagementRate:0.1,sponsoredShare:0.9}})==='','every free check can be switched off in the brief');
+ ok(C.LIMITS.DEEP_BATCH_HAIKU===10,'fast reviewer reads 10 creators per call');}
+
+out.push('several machines');
+{const s4=C.newState(brief);
+ const n=C.ingestFeed(s4,brief,'gymtok',[item('m1',20000),item('m2',20000)],new Set(['m1']));
+ ok(n===1&&s4.triageQ.join()==='m1','a machine only takes the creators it won in the shared seen-set');
+ const pi=C.planItems(Object.assign(C.newState(C.normBrief({niche_summary:'x',seed_hashtags:['gymtok']})),{keywords:['programme musculation']}));
+ ok(pi.some(x=>x.key==='t:gymtok')&&pi.some(x=>x.key==='k:programme musculation'),'plan → shared source queue: hashtags and keyword searches');
+ const sup=C.applySupervisor(C.newState(brief),{add:[{tag:'prepcoach',pri:80}],keywords:['coach prep compétition']});
+ ok(sup.items.some(x=>x.key==='t:prepcoach')&&sup.items.some(x=>x.key==='k:coach prep compétition'),'supervisor proposes hashtags AND keyword searches');}
+
+out.push('creator base');
+{const lite=C.poolLite('zed',{nick:'Zed',f:30000,sig:'coach musculation 🇫🇷',cap:['séance jambes'],lang:['fr','fr','en'],via:['gymtok','k:x']});
+ ok(lite.l==='fr'&&lite.t.join()==='gymtok'&&lite.q==='lite','lite record: compact, majority language, real hashtags only');
+ const full=C.poolFull(d,{email:'a@b.co',instagram:'@a'});
+ ok(full.q==='full'&&full.c.length<=6&&full.ct.e==='a@b.co'&&JSON.stringify(full).length<1500,'full record stays small ('+JSON.stringify(full).length+' bytes)');
+ const st=Object.assign(C.newState(brief),{keywords:['programme musculation','coach sportif']});st.tags.naturalbodybuilding={};
+ const terms=C.poolTerms(st);
+ ok(C.poolRelevant({b:'Coach sportif certifié',c:[]},terms)&&!C.poolRelevant({b:'maquillage et mode',c:['get ready with me']},terms),'base re-read by free text match first');
+ ok(C.poolRelevant({b:'',c:['my #naturalbodybuilding prep']},terms),'hashtag terms matched too');
+ ok(C.poolSkip(brief,{h:'x',f:20000,fl:['repost']}).startsWith('known'),'a page already known to be a repost is never paid for again');
+ ok(C.poolSkip(brief,{h:'x',f:100})==='below follower band','base candidates go through the same free gate');
+ const c=C.fromPool({h:'x',f:20000,b:'coach',c:['leg day'],l:'fr',ni:'powerlifting'});
+ ok(c.via[0]==='pool'&&c.known==='powerlifting'&&C.triagePrompt(brief,['x'],{cand:{x:c}}).includes('known_niche'),'known niche handed to triage');}
 
 console.log(out.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);
