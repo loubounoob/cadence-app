@@ -1,70 +1,68 @@
-// Feasibility probe #2: how deep can a signed-out headless browser go?
+// Probe #3: discovery sources beyond hashtags, from an Actions runner.
 import {chromium} from 'playwright-core';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+const handlesIn=t=>[...new Set([...String(t).matchAll(/tiktok\.com\/@([A-Za-z0-9._]{2,30})/g)].map(m=>m[1].toLowerCase()))];
 
-async function closeModals(page){
-  for(const sel of ['[data-e2e="modal-close-inner-button"]','[data-e2e="modal-close-button"]','div[role="dialog"] button[aria-label*="lose"]']){
-    try{const el=await page.$(sel);if(el){await el.click({timeout:1000});return true}}catch(e){}}
-  try{await page.keyboard.press('Escape')}catch(e){}
-  return false}
+async function cap(ctx,url,re,scrolls=4){
+  const page=await ctx.newPage();const hits=[];
+  page.on('response',async r=>{if(!re.test(r.url()))return;try{hits.push({u:r.url().split('?')[0],j:await r.json()})}catch(e){hits.push({u:r.url().split('?')[0],err:1})}});
+  try{await page.goto(url,{waitUntil:'domcontentloaded',timeout:40000});await sleep(5000);
+    for(let i=0;i<scrolls;i++){for(const s of ['[data-e2e="modal-close-inner-button"]']){try{const e=await page.$(s);if(e)await e.click({timeout:800})}catch(e){}}
+      await page.mouse.wheel(0,5000);await sleep(2000)}}catch(e){console.log('  goto',e.message.slice(0,80))}
+  const urls=await page.evaluate(()=>[...document.querySelectorAll('a[href*="/@"]')].map(a=>a.href)).catch(()=>[]);
+  await page.close();return {hits,urls}}
 
 (async()=>{
   const browser=await chromium.launch({headless:true});
-  const ctx=await browser.newContext({userAgent:UA,locale:'en-US',viewport:{width:1366,height:900}});
+  const ctx=await browser.newContext({userAgent:UA,locale:'fr-FR',viewport:{width:1366,height:900}});
+  const items=h=>h.hits.flatMap(x=>(x.j&&(x.j.itemList||x.j.item_list))||[]);
+  const authors=list=>new Set(list.map(i=>i.author&&i.author.uniqueId).filter(Boolean));
 
-  console.log('== A. tag page with modal closing + in-page cursor replay');
-  {const page=await ctx.newPage();const reqs=[];let n=0;
-    page.on('response',async r=>{if(/\/api\/challenge\/item_list\//.test(r.url())){reqs.push(r.url());try{const j=await r.json();n+=(j.itemList||[]).length;console.log('   resp items',(j.itemList||[]).length,'hasMore',j.hasMore,'cursor',j.cursor)}catch(e){}}});
-    await page.goto('https://www.tiktok.com/tag/bodybuilding',{waitUntil:'domcontentloaded',timeout:40000});await sleep(5000);
-    const ssr=await page.evaluate(()=>{const s=document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');return s?s.textContent:null});
-    try{const d=JSON.parse(ssr);const sc=d.__DEFAULT_SCOPE__;console.log('  tag ssr scope keys:',Object.keys(sc).join(','));
-      const cd=sc['webapp.challenge-detail'];if(cd)console.log('  challengeInfo:',JSON.stringify(cd.challengeInfo&&cd.challengeInfo.stats||cd).slice(0,300))}catch(e){console.log('  no ssr')}
-    for(let i=0;i<12;i++){const c=await closeModals(page);await page.mouse.wheel(0,5000);await sleep(1800);if(c)console.log('   closed modal at scroll',i)}
-    console.log(`  after scrolling: requests=${reqs.length} items=${n}`);
-    if(reqs[0]){
-      const base=reqs[reqs.length-1];
-      for(const cur of [60,90,120,300]){
-        const u=base.replace(/([?&])cursor=\d+/,`$1cursor=${cur}`);
-        const r=await page.evaluate(async u=>{try{const x=await fetch(u,{credentials:'include'});const t=await x.text();let j={};try{j=JSON.parse(t)}catch(e){};return {s:x.status,len:t.length,items:(j.itemList||[]).length,hasMore:j.hasMore,code:j.statusCode}}catch(e){return {err:e.message}}},u);
-        console.log(`   replay cursor=${cur}:`,JSON.stringify(r))}
-      // signing check: strip X-Bogus params and call from page
-      const stripped=base.replace(/&X-Bogus=[^&]*/,'').replace(/&X-Gnarly=[^&]*/,'').replace(/([?&])cursor=\d+/,'$1cursor=150');
-      const r2=await page.evaluate(async u=>{try{const x=await fetch(u);const t=await x.text();let j={};try{j=JSON.parse(t)}catch(e){};return {s:x.status,len:t.length,items:(j.itemList||[]).length}}catch(e){return {err:e.message}}},stripped);
-      console.log('   unsigned replay cursor=150:',JSON.stringify(r2));
-      console.log('   sample request url:',base.slice(0,400))}
+  console.log('== A. explore feed');
+  const ex=await cap(ctx,'https://www.tiktok.com/explore',/\/api\/(explore|recommend|discover)/,8);
+  console.log(`  apis=${[...new Set(ex.hits.map(h=>h.u))].join(' ')} items=${items(ex).length} authors=${authors(items(ex)).size} domHandles=${handlesIn(ex.urls.join(' ')).length}`);
+  const ex2=await cap(ctx,'https://www.tiktok.com/explore?lang=fr&category=sports',/\/api\/(explore|recommend|discover)/,6);
+  console.log(`  sports? apis=${[...new Set(ex2.hits.map(h=>h.u))].join(' ')} items=${items(ex2).length}`);
+  const fy=await cap(ctx,'https://www.tiktok.com/foryou',/\/api\/recommend\/item_list/,6);
+  console.log(`  foryou items=${items(fy).length}`);
+
+  console.log('== B. sound pages');
+  const tg=await cap(ctx,'https://www.tiktok.com/tag/musculation',/\/api\/challenge\/item_list/,1);
+  const mus=items(tg).map(i=>i.music).filter(m=>m&&m.id&&!m.original).slice(0,1).concat(items(tg).map(i=>i.music).filter(m=>m&&m.id&&m.original).slice(0,1));
+  for(const m of mus){
+    const slug=String(m.title||'sound').replace(/[^A-Za-z0-9]+/g,'-').slice(0,40);
+    const r=await cap(ctx,`https://www.tiktok.com/music/${slug}-${m.id}`,/\/api\/music\/item_list/,4);
+    console.log(`  music "${m.title}" original=${m.original} items=${items(r).length} authors=${authors(items(r)).size} videoCount=${m.videoCount||''}`)}
+
+  console.log('== C. video page: related feed?');
+  const v=items(tg)[0];
+  if(v){const r=await cap(ctx,`https://www.tiktok.com/@${v.author.uniqueId}/video/${v.id}`,/\/api\/(related|recommend)\//,3);
+    console.log(`  apis=${[...new Set(r.hits.map(h=>h.u))].join(' ')} items=${items(r).length} authors=${authors(items(r)).size}`)}
+
+  console.log('== D. search engines (plain HTTP)');
+  const q='site:tiktok.com "musculation" "coach"';
+  const eng={bing:`https://www.bing.com/search?q=${encodeURIComponent(q)}&count=50&setlang=fr`,
+    ddg:`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+    brave:`https://search.brave.com/search?q=${encodeURIComponent(q)}`,
+    google:`https://www.google.com/search?q=${encodeURIComponent(q)}&num=50`,
+    startpage:`https://www.startpage.com/do/search?q=${encodeURIComponent(q)}`,
+    yahoo:`https://search.yahoo.com/search?p=${encodeURIComponent(q)}&n=50`};
+  for(const [k,u] of Object.entries(eng)){
+    try{const r=await fetch(u,{headers:{'user-agent':UA,'accept-language':'fr-FR,fr;q=0.9,en;q=0.8',accept:'text/html'}});const t=await r.text();
+      console.log(`  ${k}: ${r.status} len=${t.length} handles=${handlesIn(decodeURIComponent(t.replace(/%2F/gi,'/').replace(/%40/g,'@'))).length} captcha=${/captcha|unusual traffic|are you a robot|challenge/i.test(t)}`)}catch(e){console.log(`  ${k}: err ${e.message}`)}
+    await sleep(1500)}
+
+  console.log('== E. search engines via browser');
+  for(const k of ['bing','brave','ddg']){
+    const page=await ctx.newPage();
+    try{await page.goto(eng[k],{waitUntil:'domcontentloaded',timeout:30000});await sleep(3000);
+      const html=await page.content();console.log(`  ${k}: handles=${handlesIn(decodeURIComponent(html.replace(/%2F/gi,'/').replace(/%40/g,'@'))).length} sample=${handlesIn(html).slice(0,6).join(',')}`)}
+    catch(e){console.log(`  ${k}: ${e.message.slice(0,80)}`)}
     await page.close()}
 
-  console.log('== B. profile posts');
-  const handles=['ashenb_real','muscleworldx'];
-  for(const h of handles){
-    const page=await ctx.newPage();const got=[];
-    page.on('response',async r=>{if(/\/api\/post\/item_list\//.test(r.url())){try{const j=await r.json();got.push({u:r.url(),items:(j.itemList||[]).length,code:j.statusCode,keys:Object.keys(j).join(',')})}catch(e){got.push({u:r.url(),err:e.message})}}});
-    await page.goto(`https://www.tiktok.com/@${h}`,{waitUntil:'domcontentloaded',timeout:40000});await sleep(5000);
-    for(let i=0;i<4;i++){await closeModals(page);await page.mouse.wheel(0,4000);await sleep(1800)}
-    const domVideos=await page.evaluate(()=>[...document.querySelectorAll('a[href*="/video/"]')].map(a=>a.href).slice(0,40));
-    const views=await page.evaluate(()=>[...document.querySelectorAll('[data-e2e="video-views"]')].map(e=>e.textContent).slice(0,40));
-    const ssr=await page.evaluate(()=>{const s=document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');return s?s.textContent:null});
-    let scopeKeys='';try{scopeKeys=Object.keys(JSON.parse(ssr).__DEFAULT_SCOPE__).join(',')}catch(e){}
-    console.log(`  @${h}: api=${JSON.stringify(got).slice(0,500)}`);
-    console.log(`   dom video links=${domVideos.length} views=${views.slice(0,10).join('|')} scope=${scopeKeys}`);
-    if(got[0]&&got[0].u){
-      const u=got[0].u;
-      const r=await page.evaluate(async u=>{try{const x=await fetch(u,{credentials:'include'});const t=await x.text();let j={};try{j=JSON.parse(t)}catch(e){};return {s:x.status,len:t.length,items:(j.itemList||[]).length,code:j.statusCode}}catch(e){return {err:e.message}}},u);
-      console.log('   in-page replay:',JSON.stringify(r))}
-    // single video page: captions + stats in SSR?
-    if(domVideos[0]){
-      const vp=await ctx.newPage();await vp.goto(domVideos[0],{waitUntil:'domcontentloaded',timeout:40000});await sleep(3000);
-      const v=await vp.evaluate(()=>{const s=document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');try{const d=JSON.parse(s.textContent).__DEFAULT_SCOPE__;const it=d['webapp.video-detail'].itemInfo.itemStruct;return {desc:it.desc,stats:it.stats,ct:it.createTime}}catch(e){return {err:e.message}}});
-      console.log('   video page ssr:',JSON.stringify(v).slice(0,300));await vp.close()}
-    await page.close();await sleep(2000)}
-
-  console.log('== C. plain-fetch video page + profile (no browser), 5 in a row');
-  for(const h of ['ashenb_real','muscleworldx','mike.israetel.clips','natty_or_not_','jeffnippard']){
-    const t0=Date.now();
-    const r=await fetch(`https://www.tiktok.com/@${h}`,{headers:{'user-agent':UA,'accept-language':'en-US'}});
-    const html=await r.text();const m=html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
-    let info='';try{const d=JSON.parse(m[1]).__DEFAULT_SCOPE__['webapp.user-detail'].userInfo;info=`followers=${d.stats.followerCount} videos=${d.stats.videoCount} hearts=${d.stats.heartCount} lang=${d.user.language} region=${d.user.region||''} commerce=${JSON.stringify(d.user.commerceUserInfo||{}).slice(0,80)} itemList=${(d.itemList||[]).length}`}catch(e){info='parse fail '+e.message}
-    console.log(`  @${h} ${r.status} ${Date.now()-t0}ms ${info}`)}
+  console.log('== F. bing page 2 + bio-email query');
+  for(const u of [`${eng.bing}&first=51`,`https://www.bing.com/search?q=${encodeURIComponent('site:tiktok.com "fitness" "@gmail.com"')}&count=50`]){
+    try{const r=await fetch(u,{headers:{'user-agent':UA,'accept-language':'fr-FR'}});const t=await r.text();console.log(`  ${r.status} handles=${handlesIn(t).length} ${handlesIn(t).slice(0,8).join(',')}`)}catch(e){console.log('  err',e.message)}}
   await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
