@@ -1,68 +1,50 @@
-// Probe #3: discovery sources beyond hashtags, from an Actions runner.
+// Probe #4: keyword (non-hashtag) sources — TikTok /discover SEO pages and web search engines.
 import {chromium} from 'playwright-core';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
-const handlesIn=t=>[...new Set([...String(t).matchAll(/tiktok\.com\/@([A-Za-z0-9._]{2,30})/g)].map(m=>m[1].toLowerCase()))];
-
-async function cap(ctx,url,re,scrolls=4){
-  const page=await ctx.newPage();const hits=[];
-  page.on('response',async r=>{if(!re.test(r.url()))return;try{hits.push({u:r.url().split('?')[0],j:await r.json()})}catch(e){hits.push({u:r.url().split('?')[0],err:1})}});
-  try{await page.goto(url,{waitUntil:'domcontentloaded',timeout:40000});await sleep(5000);
-    for(let i=0;i<scrolls;i++){for(const s of ['[data-e2e="modal-close-inner-button"]']){try{const e=await page.$(s);if(e)await e.click({timeout:800})}catch(e){}}
-      await page.mouse.wheel(0,5000);await sleep(2000)}}catch(e){console.log('  goto',e.message.slice(0,80))}
-  const urls=await page.evaluate(()=>[...document.querySelectorAll('a[href*="/@"]')].map(a=>a.href)).catch(()=>[]);
-  await page.close();return {hits,urls}}
+const handlesIn=t=>{const s=String(t).replace(/%40/gi,'@').replace(/%2F/gi,'/');return [...new Set([...s.matchAll(/tiktok\.com\/@([A-Za-z0-9._]{2,30})/g)].map(m=>m[1].toLowerCase()))]};
 
 (async()=>{
+  console.log('== A. /discover keyword pages (plain HTTP)');
+  for(const kw of ['musculation-femme','coach-musculation','programme-musculation','fitness-motivation-deutsch']){
+    try{const r=await fetch(`https://www.tiktok.com/discover/${kw}`,{headers:{'user-agent':UA,'accept-language':'fr-FR,fr;q=0.9'}});const t=await r.text();
+      const ids=[...t.matchAll(/<script[^>]*id="([^"]+)"/g)].map(m=>m[1]).join(',');
+      let info='';
+      const m=t.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
+      if(m){try{const d=JSON.parse(m[1]).__DEFAULT_SCOPE__;const keys=Object.keys(d);info='scope='+keys.join(',');
+        for(const k of keys){const s=JSON.stringify(d[k]);const au=new Set([...s.matchAll(/"uniqueId":"([^"]+)"/g)].map(x=>x[1]));if(au.size)info+=` | ${k}: ${au.size} authors, ${s.length}b`;
+          const rel=s.match(/"(relatedSearches|suggestedWords|relatedKeywords|keywordList)":\[[^\]]{0,400}/);if(rel)info+=` | related: ${rel[0].slice(0,300)}`}}catch(e){info='parse '+e.message}}
+      console.log(`  /discover/${kw}: ${r.status} len=${t.length} handles=${handlesIn(t).length} scripts=${ids} ${info}`)}catch(e){console.log('  err',e.message)}
+    await sleep(1200)}
+
+  console.log('== B. /discover in a browser (scroll)');
   const browser=await chromium.launch({headless:true});
   const ctx=await browser.newContext({userAgent:UA,locale:'fr-FR',viewport:{width:1366,height:900}});
-  const items=h=>h.hits.flatMap(x=>(x.j&&(x.j.itemList||x.j.item_list))||[]);
-  const authors=list=>new Set(list.map(i=>i.author&&i.author.uniqueId).filter(Boolean));
-
-  console.log('== A. explore feed');
-  const ex=await cap(ctx,'https://www.tiktok.com/explore',/\/api\/(explore|recommend|discover)/,8);
-  console.log(`  apis=${[...new Set(ex.hits.map(h=>h.u))].join(' ')} items=${items(ex).length} authors=${authors(items(ex)).size} domHandles=${handlesIn(ex.urls.join(' ')).length}`);
-  const ex2=await cap(ctx,'https://www.tiktok.com/explore?lang=fr&category=sports',/\/api\/(explore|recommend|discover)/,6);
-  console.log(`  sports? apis=${[...new Set(ex2.hits.map(h=>h.u))].join(' ')} items=${items(ex2).length}`);
-  const fy=await cap(ctx,'https://www.tiktok.com/foryou',/\/api\/recommend\/item_list/,6);
-  console.log(`  foryou items=${items(fy).length}`);
-
-  console.log('== B. sound pages');
-  const tg=await cap(ctx,'https://www.tiktok.com/tag/musculation',/\/api\/challenge\/item_list/,1);
-  const mus=items(tg).map(i=>i.music).filter(m=>m&&m.id&&!m.original).slice(0,1).concat(items(tg).map(i=>i.music).filter(m=>m&&m.id&&m.original).slice(0,1));
-  for(const m of mus){
-    const slug=String(m.title||'sound').replace(/[^A-Za-z0-9]+/g,'-').slice(0,40);
-    const r=await cap(ctx,`https://www.tiktok.com/music/${slug}-${m.id}`,/\/api\/music\/item_list/,4);
-    console.log(`  music "${m.title}" original=${m.original} items=${items(r).length} authors=${authors(items(r)).size} videoCount=${m.videoCount||''}`)}
-
-  console.log('== C. video page: related feed?');
-  const v=items(tg)[0];
-  if(v){const r=await cap(ctx,`https://www.tiktok.com/@${v.author.uniqueId}/video/${v.id}`,/\/api\/(related|recommend)\//,3);
-    console.log(`  apis=${[...new Set(r.hits.map(h=>h.u))].join(' ')} items=${items(r).length} authors=${authors(items(r)).size}`)}
-
-  console.log('== D. search engines (plain HTTP)');
-  const q='site:tiktok.com "musculation" "coach"';
-  const eng={bing:`https://www.bing.com/search?q=${encodeURIComponent(q)}&count=50&setlang=fr`,
-    ddg:`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
-    brave:`https://search.brave.com/search?q=${encodeURIComponent(q)}`,
-    google:`https://www.google.com/search?q=${encodeURIComponent(q)}&num=50`,
-    startpage:`https://www.startpage.com/do/search?q=${encodeURIComponent(q)}`,
-    yahoo:`https://search.yahoo.com/search?p=${encodeURIComponent(q)}&n=50`};
-  for(const [k,u] of Object.entries(eng)){
-    try{const r=await fetch(u,{headers:{'user-agent':UA,'accept-language':'fr-FR,fr;q=0.9,en;q=0.8',accept:'text/html'}});const t=await r.text();
-      console.log(`  ${k}: ${r.status} len=${t.length} handles=${handlesIn(decodeURIComponent(t.replace(/%2F/gi,'/').replace(/%40/g,'@'))).length} captcha=${/captcha|unusual traffic|are you a robot|challenge/i.test(t)}`)}catch(e){console.log(`  ${k}: err ${e.message}`)}
-    await sleep(1500)}
-
-  console.log('== E. search engines via browser');
-  for(const k of ['bing','brave','ddg']){
-    const page=await ctx.newPage();
-    try{await page.goto(eng[k],{waitUntil:'domcontentloaded',timeout:30000});await sleep(3000);
-      const html=await page.content();console.log(`  ${k}: handles=${handlesIn(decodeURIComponent(html.replace(/%2F/gi,'/').replace(/%40/g,'@'))).length} sample=${handlesIn(html).slice(0,6).join(',')}`)}
-    catch(e){console.log(`  ${k}: ${e.message.slice(0,80)}`)}
+  {const page=await ctx.newPage();const apis=new Map();
+    page.on('response',async r=>{const u=r.url();if(!/\/api\//.test(u))return;try{const j=await r.json();const s=JSON.stringify(j);const n=new Set([...s.matchAll(/"uniqueId":"([^"]+)"/g)].map(x=>x[1])).size;if(n)apis.set(u.split('?')[0],(apis.get(u.split('?')[0])||0)+n)}catch(e){}});
+    await page.goto('https://www.tiktok.com/discover/musculation-femme',{waitUntil:'domcontentloaded',timeout:40000});await sleep(5000);
+    for(let i=0;i<5;i++){await page.mouse.wheel(0,5000);await sleep(2000)}
+    const html=await page.content();
+    const rel=await page.evaluate(()=>[...document.querySelectorAll('a[href*="/discover/"]')].map(a=>a.getAttribute('href')).slice(0,25));
+    console.log(`  dom handles=${handlesIn(html).length} apis=${JSON.stringify([...apis])} relatedLinks=${rel.length} ${rel.slice(0,10).join(' ')}`);
     await page.close()}
 
-  console.log('== F. bing page 2 + bio-email query');
-  for(const u of [`${eng.bing}&first=51`,`https://www.bing.com/search?q=${encodeURIComponent('site:tiktok.com "fitness" "@gmail.com"')}&count=50`]){
-    try{const r=await fetch(u,{headers:{'user-agent':UA,'accept-language':'fr-FR'}});const t=await r.text();console.log(`  ${r.status} handles=${handlesIn(t).length} ${handlesIn(t).slice(0,8).join(',')}`)}catch(e){console.log('  err',e.message)}}
+  console.log('== C. web search engines');
+  const qs=['site:tiktok.com "coach musculation"','site:tiktok.com/@ musculation "gmail.com"','site:tiktok.com fitness influencerin'];
+  const eng={bing:q=>`https://www.bing.com/search?q=${encodeURIComponent(q)}&count=50`,
+    ddg:q=>`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+    brave:q=>`https://search.brave.com/search?q=${encodeURIComponent(q)}`,
+    mojeek:q=>`https://www.mojeek.com/search?q=${encodeURIComponent(q)}`,
+    google:q=>`https://www.google.com/search?q=${encodeURIComponent(q)}&num=50`};
+  for(const [k,f] of Object.entries(eng)){const res=[];
+    for(const q of qs){try{const r=await fetch(f(q),{headers:{'user-agent':UA,'accept-language':'fr-FR,fr;q=0.9,en;q=0.8',accept:'text/html'}});const t=await r.text();
+      res.push(`${r.status}/${handlesIn(t).length}${/captcha|unusual traffic|robot|challenge-form|cf-chl/i.test(t)?'/CAPTCHA':''}`)}catch(e){res.push('err')}
+      await sleep(2000)}
+    console.log(`  ${k}: ${res.join('  ')}`)}
+  console.log('== D. engines in browser');
+  for(const k of ['bing','brave','google']){const page=await ctx.newPage();
+    try{await page.goto(eng[k](qs[0]),{waitUntil:'domcontentloaded',timeout:30000});await sleep(3500);const h=await page.content();
+      console.log(`  ${k}: handles=${handlesIn(h).length} ${handlesIn(h).slice(0,8).join(',')} captcha=${/captcha|unusual traffic|robot/i.test(h)}`)}catch(e){console.log(`  ${k}: ${e.message.slice(0,80)}`)}
+    await page.close()}
   await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
