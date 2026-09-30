@@ -155,7 +155,7 @@ export function applyTriage(s,batch,out){
       c.triTries=(c.triTries||0)+1;if(c.triTries<3)s.triageQ.push(h);else{s.seen[h]='x';delete s.cand[h]}continue}
     s.stats.triaged++;
     const fit=Number(r.fit)||0;
-    if(r.pass!==false&&fit>=45){s.seen[h]='p';s.fetchQ.push(h);s.stats.triagePassed++;passed++;
+    if(r.pass!==false&&fit>=55){s.seen[h]='p';s.fetchQ.push(h);s.stats.triagePassed++;passed++;
       (s.cand[h].via||[]).forEach(t=>{if(s.tags[t])s.tags[t].passed++});s.cand[h].tri={fit,why:String(r.why||'').slice(0,80)}}
     else{s.seen[h]='x';const k='triage: '+String(r.why||'not a fit').toLowerCase().slice(0,40);s.reasons[k]=(s.reasons[k]||0)+1;delete s.cand[h]}}
   return passed}
@@ -260,7 +260,7 @@ export function vetPrompt(brief,dossiers){
     latest:d.videos.slice(0,10).map(v=>`[${v.daysAgo}d · ${v.views} views] ${v.desc}`),pinned:d.pinnedVideos.map(v=>v.desc).slice(0,3)}));
   const lang=brief.summary_language||'en';
   return `BRIEF\n${briefText(brief)}\n\nDOSSIERS (one JSON per line)\n${rows.join('\n')}\n\nFor every creator return:
-{"h","verdict":"accept|maybe|reject","score":0-100,"niche":"1-4 words, what they ACTUALLY post","fit":"why, citing concrete evidence (≤30 words)","safety":"clean|caution|risk","safety_notes":"≤20 words or empty","flags":[],"audience":"≤12 words","style":"≤12 words, content format/tone","collab":"≤20 words, how the brand could naturally work with them","summary":"2 sentences for the brand, written in language code '${lang}'"}
+{"h","verdict":"accept|maybe|reject","score":0-100,"niche":"1-4 words, what they ACTUALLY post","fit":"why, citing concrete evidence (≤22 words)","safety":"clean|caution|risk","safety_notes":"≤20 words or empty","flags":[],"audience":"≤12 words","style":"≤12 words, content format/tone","collab":"≤20 words, how the brand could naturally work with them","summary":"2 sentences for the brand, written in language code '${lang}'"}
 flags from: brand, repost, wrong_niche, values_mismatch, brand_safety, inactive, low_engagement, wrong_market, kids, adult, heavy_sponsoring.
 JSON: {"results":[...]}`}
 
@@ -281,8 +281,9 @@ export function needsEscalation(v,brief,tier){
   if(tier!=='haiku')return false;
   if(v.hard||v.safety==='risk')return false;
   if(v.verdict==='reject'&&v.score<50)return false;
-  if(v.accept&&v.score>=brief.min_score+10&&v.safety==='clean')return false;
-  return v.score>=50}
+  if(v.accept&&v.score>=brief.min_score+6&&v.safety==='clean')return false;
+  // only a genuinely close call is worth a second, costlier read
+  return v.score>=brief.min_score-8&&v.score<brief.min_score+6}
 
 /* ── contacts ───────────────────────────────────────────────────────────── */
 export function extractEmails(text){
@@ -292,24 +293,29 @@ export function extractEmails(text){
   return [...new Set((String(text||'').match(EMAIL_RE)||[]).map(norm).filter(e=>/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e)&&!BAD_EMAIL.test(e)))].slice(0,3)}
 
 export function extractLinks(html){
-  const out={instagram:'',youtube:'',x:'',website:'',emails:[]};
+  const out={instagram:'',youtube:'',x:'',website:'',emails:[],igs:[]};
   const hrefs=[...String(html||'').matchAll(/href="([^"]+)"/g)].map(m=>m[1].replace(/&amp;/g,'&'));
   for(const u of hrefs){
     if(u.startsWith('mailto:')){const e=decodeURIComponent(u.slice(7).split('?')[0]).toLowerCase();if(/@/.test(e)&&!BAD_EMAIL.test(e))out.emails.push(e);continue}
-    const ig=u.match(/instagram\.com\/([A-Za-z0-9._]{2,30})/);if(ig&&!out.instagram&&!/^(p|reel|explore|accounts)$/.test(ig[1]))out.instagram='@'+ig[1];
+    const ig=u.match(/instagram\.com\/([A-Za-z0-9._]{2,30})(?:[/?#]|$)/);if(ig&&!IG_JUNK.test(ig[1]))out.igs.push(ig[1].toLowerCase());
     const yt=u.match(/youtube\.com\/(@[A-Za-z0-9._-]{2,40}|c\/[^/?"]+|channel\/[A-Za-z0-9_-]+)/);if(yt&&!out.youtube)out.youtube='https://youtube.com/'+yt[1];
     const x=u.match(/(?:twitter|x)\.com\/([A-Za-z0-9_]{2,20})(?:[/?]|$)/);if(x&&!out.x&&!/^(intent|share|home)$/.test(x[1]))out.x='@'+x[1]}
   out.emails=[...new Set(out.emails.concat(extractEmails(html)))].slice(0,3);
+  out.instagram=out.igs[0]?'@'+out.igs[0]:'';
   return out}
+const IG_JUNK=/^(p|reel|reels|explore|accounts|stories|hts|http|https|www|linktr\.?ee|linktree|beacons|stan\.?store|instagram|about|legal|direct|tv)$/i;
 
 export function contactsFrom(d,linkPage){
   const bioEmails=extractEmails(d.bio);
   const lp=linkPage?extractLinks(linkPage):{instagram:'',youtube:'',x:'',website:'',emails:[]};
-  const ig=(d.bio.match(/(?:ig|insta(?:gram)?)\s*[:\-–]?\s*@?([A-Za-z0-9._]{3,30})/i)||[])[1];
+  const ig=(d.bio.match(/(?:\big|insta(?:gram)?)\s*[:\-–]?\s*@([A-Za-z0-9._]{3,30})/i)||[])[1];
+  // several Instagram links on a link page: prefer the one that looks like this creator
+  const key=d.handle.replace(/[._]/g,'');
+  if(lp.igs&&lp.igs.length>1){const m=lp.igs.find(h=>h.replace(/[._]/g,'').includes(key.slice(0,6))||key.includes(h.replace(/[._]/g,'').slice(0,6)));if(m)lp.instagram='@'+m}
   const email=bioEmails[0]||lp.emails[0]||'';
   return {email,emailSource:bioEmails[0]?'bio':lp.emails[0]?'bio link':'',
     otherEmails:[...new Set(bioEmails.concat(lp.emails))].filter(e=>e!==email).slice(0,2),
-    instagram:lp.instagram||(ig?'@'+ig:''),youtube:lp.youtube,x:lp.x,link:d.bioLink||''}}
+    instagram:(ig?'@'+ig.toLowerCase():'')||lp.instagram,youtube:lp.youtube,x:lp.x,link:d.bioLink||''}}
 
 /* ── the record the brand sees ──────────────────────────────────────────── */
 export function resultRecord(d,v,contacts,tier){

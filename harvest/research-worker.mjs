@@ -120,7 +120,7 @@ async function supervise(force){
 
 async function browserLoop(){
   while(!stop){
-    if(S.triageQ.length>600||S.fetchQ.length>400||S.deepQ.length>150){await sleep(3000);continue}
+    if(S.triageQ.length>300||S.fetchQ.length>120||S.deepQ.length+S.escalateQ.length>60){await sleep(3000);continue}
     const tag=C.nextTag(S);
     if(!tag){await sleep(4000);continue}
     const items=await harvestTag(tag);
