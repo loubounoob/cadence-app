@@ -6166,6 +6166,7 @@ How to work:
 {"title":"short name","brand":"","product":"","goal":"","niche_summary":"2-4 sentences: who exactly we want","persona":"one sentence","must_have":[],"nice_to_have":[],"exclude":[],"values":[],"tone":"","audience":"","markets":["FR"],"languages":["fr"],"followers":{"min":10000,"max":500000},"target_count":500,"min_score":72,"max_inactive_days":45,"contact_required":false,"example_creators":[],"seed_hashtags":[],"quality":"balanced","summary_language":"fr"}
 \`\`\`
 - seed_hashtags: 15–30 of your best hashtags for this niche, in every market language, without #.
+- For large searches (hundreds of creators or more) suggest a follower floor of 5,000 unless the brand wants bigger creators: micro-creators are the bulk of any niche and often the most engaged.
 - If the brand later asks for changes, output the full updated brief block again.`};
 
 const RS={jobs:[],open:null,job:null,results:{},poll:null,loading:false,filter:{min:0,email:false,clean:false,q:'',sort:'score'},shown:150,sending:false};
@@ -6228,6 +6229,7 @@ function rsRenderBrief(){
     <div class="fl">
       <div class="fg"><label>Quality bar (score /100)</label><input id="rsb-score" value="${esc(String(b.min_score||72))}"></div>
       <div class="fg"><label>Max AI budget ($)</label><input id="rsb-budget" value="${esc(String(b.max_cost_usd||Math.max(10,Math.round((b.target_count||500)*0.04))))}"></div>
+      <div class="fg"><label>Machines in parallel</label><select id="rsb-mach">${[1,2,4,6,8].map(n=>`<option value="${n}" ${(b.machines||4)===n?'selected':''}>${n} — ${n===1?'slow, for small tests':'≈'+n+'× faster, same cost'}</option>`).join('')}</select></div>
       <div class="fg"><label>Contact required</label><select id="rsb-contact"><option value="0" ${!b.contact_required?'selected':''}>No — keep great creators without a public email</option><option value="1" ${b.contact_required?'selected':''}>Yes — only creators with an email or Instagram</option></select></div>
       <div class="fg"><label>Reference creators</label><input id="rsb-ex" value="${esc(list(b.example_creators))}"></div>
     </div>
@@ -6247,7 +6249,7 @@ function rsReadBrief(){
   b.followers={min:n($('rsb-min').value),max:n($('rsb-max').value)};
   b.target_count=n($('rsb-n').value)||500;b.quality=$('rsb-q').value;
   b.min_score=n($('rsb-score').value)||72;b.max_cost_usd=n($('rsb-budget').value)||undefined;
-  b.contact_required=$('rsb-contact').value==='1';b.example_creators=arr($('rsb-ex').value);
+  b.contact_required=$('rsb-contact').value==='1';b.machines=+$('rsb-mach').value||4;b.example_creators=arr($('rsb-ex').value);
   return b}
 
 async function rsLaunch(btn){
@@ -6302,9 +6304,10 @@ async function rsLoadResults(id){
 async function rsCtl(op,extra){
   const id=RS.open;if(!id)return;
   if(op==='cancel'&&typeof confirm==='function'&&!confirm('Stop this research? Everything found so far is kept, and you can resume it later.'))return;
-  let addTarget=0;
-  if(op==='resume'){const v=typeof prompt==='function'?prompt('Resume and look for how many MORE creators? (0 = keep the same target)','200'):'0';if(v===null)return;addTarget=+String(v).replace(/[^0-9]/g,'')||0}
-  await apiFetch('/api/research?op='+op,{method:'POST',body:JSON.stringify({id,addTarget,...(extra||{})})});
+  let addTarget=0,addBudget=0;
+  if(op==='resume'){const v=typeof prompt==='function'?prompt('Resume and look for how many MORE creators? (0 = keep the same target)','200'):'0';if(v===null)return;addTarget=+String(v).replace(/[^0-9]/g,'')||0;
+    const bgt=typeof prompt==='function'?prompt('Add AI budget in $ (0 = none; needed if the search stopped on its budget)','10'):'0';addBudget=+String(bgt||0).replace(/[^0-9.]/g,'')||0}
+  await apiFetch('/api/research?op='+op,{method:'POST',body:JSON.stringify({id,addTarget,addBudget,...(extra||{})})});
   await rsRefresh(true)}
 
 /* ── detail + results ─────────────────────────────────────────────────── */
@@ -6325,7 +6328,7 @@ function rsRenderDetail(){
   const all=RS.results[j.id]||[],rows=rsFiltered();
   el.innerHTML=`<div class="panel" style="margin-top:14px"><div style="padding:16px 18px">
     <div class="sh"><div><b style="font-weight:500">${esc((j.brief&&(j.brief.title||j.brief.brand))||'Research')}</b> <span class="pill ${st[1]}">${st[0]}</span>
-        <span class="hd"> · ${esc(j.phase||'')} · running ${rsDur(s.elapsedMs)} · AI $${(s.costUsd||0).toFixed(2)}</span></div>
+        <span class="hd"> · ${esc(j.phase||'')}${s.machines?` · ${s.machines} machine${s.machines>1?'s':''} working`:''} · running ${rsDur(s.elapsedMs)} · AI $${(s.costUsd||0).toFixed(2)}${s.accepted?` ($${((s.costUsd||0)/s.accepted).toFixed(3)} per creator)`:''}</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${['queued','running'].includes(j.status)?`<button class="btn sm gh" onclick="rsCtl('cancel')">Stop</button>`:''}
         ${['done','cancelled','failed'].includes(j.status)?`<button class="btn sm" onclick="rsCtl('resume')">Keep searching</button>`:''}
@@ -6334,7 +6337,7 @@ function rsRenderDetail(){
     <div class="bar"><i style="width:${pct}%"></i></div>
     <div class="pgrid" style="border:1px solid var(--line);border-radius:10px;overflow:hidden">
       <div class="pc"><div class="t">Accepted</div><div class="big">${num(s.accepted||0)}</div><div class="sm2">of ${num(j.target)} wanted · ${num(all.filter(x=>x.contacts&&x.contacts.email).length)} with an email</div></div>
-      <div class="pc"><div class="t">Discovered</div><div class="big">${num(s.authorsSeen||0)}</div><div class="sm2">${num(s.postsRead||0)} posts · ${num(s.tagsDone||0)} hashtags explored · ${num(s.tagsQueued||0)} queued</div></div>
+      <div class="pc"><div class="t">Discovered</div><div class="big">${num(s.authorsSeen||0)}</div><div class="sm2">${num(s.postsRead||0)} posts · ${num(s.sourcesDone||s.tagsDone||0)} hashtags & keyword searches · ${num(s.sourcesQueued||s.tagsQueued||0)} queued${s.poolHits?` · ${num(s.poolHits)} from your creator base`:''}</div></div>
       <div class="pc"><div class="t">Triaged · Haiku</div><div class="big">${num(s.triaged||0)}</div><div class="sm2">${num(s.triagePassed||0)} passed · ${num(s.gated||0)} filtered by rules</div></div>
       <div class="pc"><div class="t">Vetted in depth</div><div class="big">${num(s.vetted||0)}</div><div class="sm2">${num(s.dossiers||0)} dossiers · ${num(s.escalated||0)} re-read by Sonnet · ${num(s.rejected||0)} rejected</div></div>
     </div>
@@ -6405,8 +6408,8 @@ function rsPanel(){
   setTimeout(rsMount,0);
   return `<div class="card">
     <div class="sh" style="margin-bottom:10px"><h2 style="font-size:19px">Deep creator research</h2>
-      <span class="pill g">AI-supervised · no paid scraper</span></div>
-    <div class="hd" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">Explain what you need to the strategist. It asks the right questions, writes the brief, then an autonomous search explores TikTok hashtag by hashtag, follows the trails the best creators leave (the hashtags they use, the creators they tag), and vets every candidate on their real latest videos — niche, values, brand safety, audience, engagement — before anyone reaches your list. It runs in the cloud for as long as it takes.</div>
+      <span class="pill g">AI-supervised · no paid scraper<span id="rs-pool"></span></span></div>
+    <div class="hd" style="font-size:13.5px;line-height:1.6;margin-bottom:12px">Explain what you need to the strategist. It asks the right questions, writes the brief, then several machines search TikTok in parallel — by keyword (TikTok's own keyword rankings, captions and speech, hashtag or not) and by hashtag — start from your creator base built by every past search, follow the trails the best creators leave (their hashtags, sounds, the creators they tag), and vet every candidate on their real latest videos — niche, values, brand safety, audience, engagement — before anyone reaches your list. It runs in the cloud for as long as it takes.</div>
     <div id="rs-chat" style="max-height:420px;overflow:auto;padding:4px 2px;background:transparent"></div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <textarea id="rs-in" style="min-height:52px;flex:1" placeholder="e.g. We're Teveo, a gym apparel brand. We want thousands of gym creators — bodybuilding, strength — with a clean, positive image…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rsSend()}"></textarea>
@@ -6418,6 +6421,7 @@ function rsPanel(){
 
 function rsMount(){
   if(!$('rs-chat'))return;
+  apiFetch('/api/research?op=pool',{method:'GET'}).then(r=>r.json()).then(j=>{const el=$('rs-pool');if(el&&j.creators)el.textContent=` · creator base: ${num(j.creators)}`}).catch(()=>{});
   rsRenderChat();rsRenderBrief();rsRenderJobs();rsRenderDetail();
   rsLoadJobs().then(()=>{if(!RS.open&&RS.jobs[0])rsOpen(RS.jobs[0].id);else if(RS.open)rsOpen(RS.open)})}
 </script>
