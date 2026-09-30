@@ -26,6 +26,9 @@ function fakeRedis(){
       case 'LTRIM':{const l=L(a[0]);const st=+a[1],en=+a[2];s.set(a[0],l.slice(st,en+1));return 'OK'}
       case 'LRANGE':{const l=get(a[0])||[];return l.slice(+a[1],+a[2]+1)}
       case 'LLEN':{return (get(a[0])||[]).length}
+      case 'RPUSH':{const l=L(a[0]);a.slice(1).forEach(v=>l.push(String(v)));return l.length}
+      case 'HMGET':{const h=get(a[0]);return a.slice(1).map(f=>h instanceof Map&&h.has(f)?h.get(f):null)}
+      case 'HEXISTS':{const h=get(a[0]);return h instanceof Map&&h.has(a[1])?1:0}
       case 'SADD':{const l=L(a[0]);let n=0;a.slice(1).forEach(v=>{v=String(v);if(!l.includes(v)){l.push(v);n++}});return n}
       case 'SMEMBERS':{return (get(a[0])||[]).slice()}
       case 'SCARD':{return (get(a[0])||[]).length}

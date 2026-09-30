@@ -163,7 +163,7 @@ async function runUntil(t,cond,max=400){for(let i=0;i<max;i++){if(t.E(cond))retu
    await runUntil(t2,"dxJob().status!=='running'",100);
    t2.E("show('discover')");t2.E("setPlat('tiktok')");
    const ui=t2.E("document.body.innerHTML");
-   ok(ui.includes('Find TikTok creators at scale')&&ui.includes('Manual keyword search (old)')&&ui.includes('Triaged')&&ui.includes('Deep-reviewed'),'Discover → TikTok shows the engine, the live job and the old search folded away');
+   ok(ui.includes('Deep creator research')&&ui.includes('Legacy paid engine (Apify)')&&ui.includes('Find TikTok creators at scale')&&ui.includes('Deep-reviewed'),'Discover → TikTok leads with the AI research chat; the paid engine and old search are folded away');
    t2.close()}
 
    out.push('two-tier review: Haiku triages everyone, Sonnet only judges the shortlist')
