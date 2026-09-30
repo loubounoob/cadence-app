@@ -56,7 +56,12 @@ function log(m){console.log(m);logBuf.push(m)}
 async function ai(tier,system,prompt,maxTokens){
   const payload={tier,max_tokens:maxTokens,system:[{type:'text',text:system,cache_control:{type:'ephemeral'}}],
     messages:[{role:'user',content:prompt+'\n\nReturn only one JSON object.'}]};
-  const j=await api('ai',{payload},4);
+  let j;
+  try{j=await api('ai',{payload},4)}
+  catch(e){
+    // no point retrying for hours: the model account itself is out of credit
+    if(/credit balance|billing/i.test(e.message)&&!stop){shardStatus='done';stopWhy='Paused — the Anthropic account is out of credit. Top it up, then click "Keep searching": every machine resumes from its checkpoint.';stop=true}
+    throw e}
   C.meter(S,tier,j.usage);
   const text=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
   return C.parseJSON(text)}
