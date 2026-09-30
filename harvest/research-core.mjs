@@ -23,7 +23,7 @@
                     Instagram, YouTube, site).
    ════════════════════════════════════════════════════════════════════════ */
 
-export const LIMITS={TRIAGE_BATCH:40,DEEP_BATCH_SONNET:5,DEEP_BATCH_HAIKU:6,MAX_TAGS:1500,SUPERVISE_EVERY_TAGS:30,MAX_SNOWBALL_PER_STEP:40};
+export const LIMITS={TRIAGE_BATCH:40,DEEP_BATCH_SONNET:5,DEEP_BATCH_HAIKU:10,MAX_TAGS:4000,SUPERVISE_EVERY_TAGS:30,MAX_SNOWBALL_PER_STEP:40};
 
 export const EMAIL_RE=/[A-Za-z0-9._%+-]+\s?(?:@|\(at\)|\[at\]| at )\s?[A-Za-z0-9-]+(?:\s?(?:\.|\(dot\)|\[dot\]| dot )\s?[A-Za-z0-9-]+)*\s?(?:\.|\(dot\)|\[dot\]| dot )\s?[A-Za-z]{2,}/g;
 const BAD_EMAIL=/(example|sentry|wixpress|@2x|\.png|\.jpg|\.webp|noreply|no-reply|domain\.com|email\.com$)/i;
@@ -58,7 +58,12 @@ export function normBrief(b){
     quality:b.quality==='max'?'max':'balanced',
     max_cost_usd:Math.max(2,Number(b.max_cost_usd)||Math.max(10,Math.round(Math.max(10,Math.min(20000,Number(b.target_count)||500))*0.04))),
     summary_language:String(b.summary_language||b.language||'en').slice(0,5),
-    contact_required:!!b.contact_required}}
+    contact_required:!!b.contact_required,
+    // free gates on real numbers, before any vetting call (0 = off)
+    min_engagement:Math.max(0,Number(b.min_engagement??1)),          // % likes+comments+shares / views
+    min_views_ratio:Math.max(0,Number(b.min_views_ratio??0.02)),     // median views / followers
+    max_sponsored:Math.max(0,Math.min(1,Number(b.max_sponsored??0.7))),
+    strict_language:b.strict_language!==false}}
 
 export function briefText(b){
   const L=[];
@@ -80,10 +85,10 @@ export function briefText(b){
 export function newState(brief){
   const tags={};
   brief.seed_hashtags.forEach(t=>{tags[t]={src:'brief',pri:90,st:'todo',posts:0,authors:0,passed:0,acc:0}});
-  return {v:1,planned:false,tags,seen:{},cand:{},triageQ:[],fetchQ:[],deepQ:[],escalateQ:[],probeQ:[],
-    dossiers:{},hashCo:{},mentions:{},reasons:{},notes:[],
+  return {v:2,planned:false,tags,seen:{},cand:{},triageQ:[],fetchQ:[],deepQ:[],escalateQ:[],probeQ:[],
+    dossiers:{},hashCo:{},soundCo:{},mentions:{},reasons:{},notes:[],poolBuf:[],
     stats:{postsRead:0,authorsSeen:0,gated:0,triaged:0,triagePassed:0,dossiers:0,dossierFail:0,vetted:0,escalated:0,accepted:0,rejected:0,
-      tagsDone:0,tokensIn:0,tokensOut:0,costUsd:0,elapsedMs:0},
+      tagsDone:0,sourcesDone:0,poolHits:0,tokensIn:0,tokensOut:0,costUsd:0,elapsedMs:0},
     tagsSinceSupervise:0,supervisions:0,expansionsDry:0,done:false}}
 
 export function addTags(s,list,src,pri){
@@ -100,9 +105,13 @@ export function nextTag(s){
   return best}
 
 /* ── discover: a hashtag feed page → candidates ─────────────────────────── */
-export function ingestFeed(s,brief,tag,items){
-  const T=s.tags[tag];if(T){T.st='done';T.posts=items.length}
-  s.stats.postsRead+=items.length;s.stats.tagsDone++;s.tagsSinceSupervise++;
+/* tag: a source label ("gymtok" for a hashtag, "k:coach musculation" for a
+   keyword page, "s:<id>" for a sound…). allow: when several machines share a
+   job, only the authors this machine won in the shared "seen" set. */
+export function ingestFeed(s,brief,tag,items,allow){
+  let T=s.tags[tag];if(!T)T=s.tags[tag]={src:'shared',pri:50,st:'done',posts:0,authors:0,passed:0,acc:0};
+  T.st='done';T.posts=items.length;
+  s.stats.postsRead+=items.length;s.stats.tagsDone++;s.stats.sourcesDone=(s.stats.sourcesDone||0)+1;s.tagsSinceSupervise++;
   const fresh=new Set();
   for(const it of items){
     const a=it&&it.author;if(!a)continue;
@@ -110,6 +119,7 @@ export function ingestFeed(s,brief,tag,items){
     const st=(it.authorStats||{});const vs=it.stats||{};
     const known=s.seen[h];
     if(known&&!s.cand[h])continue;             // already decided
+    if(!known&&allow&&!allow.has(h))continue;  // another machine has it
     let c=s.cand[h];
     if(!c){c=s.cand[h]={f:Number(st.followerCount)||0,hearts:Number(st.heartCount||st.heart)||0,vids:Number(st.videoCount)||0,
       sig:String(a.signature||'').slice(0,300),nick:String(a.nickname||'').slice(0,80),ver:!!a.verified,priv:!!a.privateAccount,
@@ -143,7 +153,7 @@ Answer only with the JSON asked for.`;
 
 export function triagePrompt(brief,batch,s){
   const rows=batch.map(h=>{const c=s.cand[h]||{};
-    return JSON.stringify({h:'@'+h,f:c.f,likes:c.hearts,vids:c.vids,bio:c.sig,name:c.nick,cap:c.cap.slice(0,3),lang:[...new Set(c.lang)].join('/'),found_in:c.via.slice(0,3).map(t=>'#'+t)})});
+    return JSON.stringify({h:'@'+h,f:c.f,likes:c.hearts,vids:c.vids,bio:c.sig,name:c.nick,cap:c.cap.slice(0,3),lang:[...new Set(c.lang)].join('/'),found_in:c.via.slice(0,3).map(t=>/[:@]|^pool$/.test(t)?t:'#'+t),...(c.known?{known_niche:c.known}:{})})});
   return `BRIEF\n${briefText(brief)}\n\nCREATORS (one JSON per line)\n${rows.join('\n')}\n\nFor every creator return {"h","pass":true|false,"fit":0-100,"why":"≤8 words"}.\nJSON: {"results":[...]}`}
 
 export function applyTriage(s,batch,out){
@@ -189,7 +199,7 @@ export function parseVideoHtml(html){
       ad:!!(it.isAd||it.brandOrganicType||(it.anchors&&it.anchors.length&&0)),
       tags:(it.textExtra||[]).map(x=>x.hashtagName).filter(Boolean).map(cleanTag),
       mentions:(it.textExtra||[]).map(x=>x.userUniqueId).filter(Boolean).map(cleanHandle),
-      music:it.music&&it.music.title||''}}catch(e){return null}}
+      music:it.music&&it.music.title||'',musicId:it.music&&String(it.music.id||''),musicOriginal:!!(it.music&&it.music.original)}}catch(e){return null}}
 
 /* Real metrics from what the dossier fetched. Pinned videos (the first ones
    the embed lists, often far older) are kept apart so they don't skew
@@ -223,7 +233,34 @@ export function dossierGate(brief,d){
   if(m.lastPostDays!=null&&m.lastPostDays>brief.max_inactive_days)return 'inactive';
   if(brief.min_median_views&&m.medViews<brief.min_median_views)return 'views too low';
   if(d.org)return 'organisation account';
+  // dead or bought audience: almost nobody who follows them sees the videos
+  if(brief.min_views_ratio&&m.sampled>=4&&m.followers>0&&m.medViews/m.followers<brief.min_views_ratio)return 'low reach vs followers';
+  if(brief.min_engagement&&m.engagementRate!=null&&m.engagementRate<brief.min_engagement)return 'low engagement';
+  if(brief.max_sponsored<1&&m.sponsoredShare>brief.max_sponsored)return 'mostly sponsored content';
+  if(brief.strict_language&&brief.languages.length){
+    const l=detectLang([d.bio,...d.videos.map(v=>v.desc)].join(' \n '));
+    if(l.lang&&l.conf>=0.6&&!brief.languages.includes(l.lang))return 'language: '+l.lang}
   return ''}
+
+/* Tiny stop-word language guess — free, good enough to drop clear off-market
+   creators before a model reads them (hashtags and @handles are ignored). */
+const STOP={
+  fr:'le la les des une est pas pour avec que qui sur dans mon ma mes ton tes vous nous je tu il elle et au aux du ce cette mais plus tout faire comme sont',
+  en:'the and you your for with this that are was not but have what just when get how my me it is to of in on so all do',
+  de:'der die das und ist nicht mit ein eine ich du wir sie auf für zu den dem mein dein auch wie noch sich nach bei',
+  es:'el la los las que por con para una uno es no mi tu pero como más muy este esta del al lo se',
+  it:'il lo la gli le che per con una uno non mio tuo ma come più molto questo questa del della sono',
+  pt:'o a os as que por com para uma um não meu minha mas como mais muito este esta do da são você',
+  nl:'de het een en ik je niet met voor op zijn van dat die wat maar ook als bij naar'};
+const STOPSETS=Object.fromEntries(Object.entries(STOP).map(([k,v])=>[k,new Set(v.split(' '))]));
+export function detectLang(text){
+  const words=String(text||'').toLowerCase().replace(/[#@][\p{L}\p{N}_.]+/gu,' ').replace(/https?:\/\/\S+/g,' ').match(/\p{L}+/gu)||[];
+  if(words.length<12)return {lang:'',conf:0};
+  const score={};for(const w of words)for(const [k,set] of Object.entries(STOPSETS))if(set.has(w))score[k]=(score[k]||0)+1;
+  const ranked=Object.entries(score).sort((a,b)=>b[1]-a[1]);
+  if(!ranked.length||ranked[0][1]<4)return {lang:'',conf:0};
+  const total=ranked.reduce((a,x)=>a+x[1],0);
+  return {lang:ranked[0][0],conf:+(ranked[0][1]/total).toFixed(2)}}
 
 export function buildDossier(handle,cand,prof,emb,vpages,now){
   const m=metrics(prof,emb,vpages,now);
@@ -236,6 +273,7 @@ export function buildDossier(handle,cand,prof,emb,vpages,now){
     pinnedVideos:vids.slice(0,m.pinned).map(v=>({id:v.id,desc:v.desc,views:v.views})),
     tags:[...new Set((vpages||[]).flatMap(v=>v?v.tags:[]).concat(recent.flatMap(v=>(v.desc.match(/#[\p{L}\p{N}_]+/gu)||[]).map(cleanTag))))].slice(0,40),
     mentions:[...new Set((vpages||[]).flatMap(v=>v?v.mentions:[]))].filter(x=>x&&x!==handle).slice(0,20),
+    sounds:(vpages||[]).filter(v=>v&&v.musicId&&!v.musicOriginal).map(v=>({id:v.musicId,title:v.music})).slice(0,3),
     via:(cand&&cand.via)||[],triage:(cand&&cand.tri)||null}}
 
 /* ── vetting ────────────────────────────────────────────────────────────── */
@@ -333,7 +371,8 @@ export function learnFromAccepted(s,d){
   (d.via||[]).forEach(t=>{if(s.tags[t])s.tags[t].acc++});
   d.tags.forEach(t=>{if(t&&!s.tags[t])s.hashCo[t]=(s.hashCo[t]||0)+1});
   d.mentions.forEach(h=>{if(h&&!s.seen[h]){s.mentions[h]=(s.mentions[h]||0)+1;
-    if(s.mentions[h]===1){s.seen[h]='m';s.probeQ.push(h)}}})}
+    if(s.mentions[h]===1){s.seen[h]='m';s.probeQ.push(h)}}});
+  (d.sounds||[]).forEach(x=>{if(x&&x.id){const k=x.id+'|'+String(x.title||'').slice(0,40);s.soundCo[k]=(s.soundCo[k]||0)+1}})}
 
 /* ── supervisor ─────────────────────────────────────────────────────────── */
 export const SUP_SYS=`You supervise an autonomous creator-research run for a brand. You see how each hashtag is performing (how many of its authors survived triage and final vetting), which hashtags the ACCEPTED creators themselves use, and why candidates get rejected. Steer the search toward where the right creators actually are: propose new hashtags (niche, mid and long-tail, in every market language, including community slang and sub-niches the accepted creators use), and name hashtags to stop exploring. Avoid generic mega-tags (#fyp, #viral, #foryou) and brand names. Answer only with the JSON asked for.`;
@@ -352,15 +391,20 @@ HASHTAGS USED BY ACCEPTED CREATORS (count)\n${co.join(' ')||'(none yet)'}
 REJECTION REASONS\n${reasons.join('\n')||'(none yet)'}
 Already explored or queued (do not repeat): ${Object.keys(s.tags).slice(-300).join(' ')}
 
-Return {"add":[{"tag":"...","pri":1-100,"why":"≤8 words"}] (up to ${LIMITS.MAX_SNOWBALL_PER_STEP} NEW hashtags),"drop":["tags to stop"],"note":"one sentence for the brand on what you are changing and why, in language '${brief.summary_language}'"}`}
+Return {"add":[{"tag":"...","pri":1-100,"why":"≤8 words"}] (up to ${LIMITS.MAX_SNOWBALL_PER_STEP} NEW hashtags),"keywords":["up to 15 NEW search phrases a viewer would type to find these creators, in the market languages"],"drop":["tags to stop"],"note":"one sentence for the brand on what you are changing and why, in language '${brief.summary_language}'"}`}
 
 export function applySupervisor(s,out){
   const add=(out&&Array.isArray(out.add)?out.add:[]).slice(0,LIMITS.MAX_SNOWBALL_PER_STEP);
   const n=addTags(s,add.map(x=>({tag:x.tag,pri:Math.max(1,Math.min(100,Number(x.pri)||60))})),'supervisor');
+  const kw=(out&&Array.isArray(out.keywords)?out.keywords:[]).map(k=>({key:'k:'+cleanKeyword(typeof k==='string'?k:k.q),pri:Math.max(1,Math.min(100,Number(k.pri)||65))})).filter(x=>x.key.length>4).slice(0,20);
   let dropped=0;(out&&Array.isArray(out.drop)?out.drop:[]).forEach(t=>{const k=cleanTag(t);if(s.tags[k]&&s.tags[k].st==='todo'){s.tags[k].st='dropped';dropped++}});
   s.tagsSinceSupervise=0;s.supervisions++;
   const note=String(out&&out.note||'').slice(0,300);if(note)s.notes.push(note);
-  return {added:n,dropped,note}}
+  const items=add.map(x=>({key:'t:'+cleanTag(x.tag),pri:Math.max(1,Math.min(100,Number(x.pri)||60))})).filter(x=>x.key.length>3).concat(kw);
+  // sounds the accepted creators use, most shared first
+  Object.entries(s.soundCo).sort((a,b)=>b[1]-a[1]).slice(0,6).forEach(([k,c])=>{if(c>=2&&!s.soundsQueued?.[k]){(s.soundsQueued=s.soundsQueued||{})[k]=1;items.push({key:'s:'+k,pri:55})}});
+  return {added:n,dropped,note,items}}
+export const cleanKeyword=k=>String(k||'').toLowerCase().replace(/[#@]/g,'').replace(/[^\p{L}\p{N}\s'-]/gu,' ').replace(/\s+/g,' ').trim().slice(0,60);
 
 /* ── plan ───────────────────────────────────────────────────────────────── */
 export const PLAN_SYS=`You plan TikTok creator research for brands. You know how TikTok hashtags work: mega tags (#fitness) are noisy and dominated by huge accounts; mid tags (#gymtok, #legday) and long-tail/community tags (#naturalbodybuilding, #prepcoach, #musculationfemme) are where real, mid-size creators live. You think in every market language and in the community's own slang. Answer only with the JSON asked for.`;
@@ -369,8 +413,9 @@ export function planPrompt(brief){
   return `BRIEF\n${briefText(brief)}\n\nPlan the research.
 - "hashtags": ONE string of 80–120 space-separated entries "tag:pri" (e.g. "gymtok:70 musculationfemme:90"), lowercase, no #, no brand names, spread ~10% head / 45% mid / 45% long-tail, covering every sub-niche, format (tutorials, routines, transformations, vlogs, coaching, competitions…) and market language in the brief. pri 1-100 = how likely its authors are exactly the brief's creators.
 - "disqualifiers": up to 25 lowercase words/short phrases that, if present in a bio or name, prove a creator is NOT a fit (e.g. shop, official, clips, fanpage, compilation, onlyfans...), tailored to this brief.
+- "keywords": 30–50 short search phrases (2–4 words) a viewer would type to find these creators — in every market language, NOT hashtags, e.g. "programme musculation femme", "trainingsplan muskelaufbau". They also let us recognise the niche in bios and captions.
 - "persona": one sentence describing the ideal creator.
-JSON: {"hashtags":"tag:pri tag:pri ...","disqualifiers":[...],"persona":"..."}`}
+JSON: {"hashtags":"tag:pri tag:pri ...","keywords":[...],"disqualifiers":[...],"persona":"..."}`}
 
 export function applyPlan(s,brief,out){
   let h=(out&&out.hashtags)||[];
@@ -378,7 +423,12 @@ export function applyPlan(s,brief,out){
   const n=addTags(s,h,'plan',60);
   brief._disq=[...new Set((out&&out.disqualifiers||[]).map(x=>String(x).toLowerCase().trim()).filter(x=>x.length>2))].slice(0,25);
   s.disq=brief._disq;s.persona=String(out&&out.persona||'').slice(0,300);s.planned=true;
+  s.keywords=[...new Set((out&&Array.isArray(out.keywords)?out.keywords:[]).map(cleanKeyword).filter(k=>k.length>3))].slice(0,60);
   return n}
+/* Everything a plan adds, as items for the shared source queue. */
+export function planItems(s){
+  return Object.entries(s.tags).filter(([,v])=>v.st==='todo').map(([t,v])=>({key:'t:'+t,pri:v.pri}))
+    .concat((s.keywords||[]).map(k=>({key:'k:'+k,pri:75})))}
 
 /* ── helpers for the loop ───────────────────────────────────────────────── */
 export function parseJSON(text){
@@ -418,3 +468,45 @@ export function repairQueues(s){
 
 export function isExhausted(s){
   return !nextTag(s)&&!s.triageQ.length&&!s.fetchQ.length&&!s.deepQ.length&&!s.escalateQ.length&&!s.probeQ.length}
+
+/* ── shared creator base — the long-term moat ────────────────────────────
+   Every creator this system ever reads is kept compactly in the app's Redis
+   (api/research.js pool-*), across brands and searches. A new search first
+   re-reads the base (free relevance filter, then the usual triage), and only
+   then crawls TikTok for more. Brand-independent facts learned while vetting
+   (real niche, brand-safety, "this is a repost/brand/kids page") are kept too,
+   so nobody pays twice to rule out the same page. Short keys keep ~15–25k
+   full records inside a 30 MB store. */
+const DAY_MS=86400000;
+const majority=a=>{const c={};(a||[]).forEach(x=>{if(x)c[x]=(c[x]||0)+1});return (Object.entries(c).sort((x,y)=>y[1]-x[1])[0]||[''])[0]};
+export function poolLite(h,c){
+  return {h,n:String(c.nick||'').slice(0,40),f:c.f||0,hv:c.hearts||0,v:c.vids||0,b:String(c.sig||'').slice(0,160),
+    c:(c.cap||[]).slice(0,3).map(x=>String(x).slice(0,90)),l:majority(c.lang),t:(c.via||[]).filter(x=>!/[:@]/.test(x)).slice(0,6),at:Date.now(),q:'lite'}}
+export function poolFull(d,contacts){
+  const l=detectLang([d.bio,...d.videos.map(v=>v.desc)].join(' \n '));
+  const rec={h:d.handle,n:String(d.nick||'').slice(0,40),f:d.m.followers,hv:d.hearts,v:d.vids,b:String(d.bio||'').slice(0,200),lk:d.bioLink||'',
+    c:d.videos.slice(0,6).map(v=>String(v.desc).slice(0,90)),l:l.lang||'',
+    m:{med:d.m.medViews,er:d.m.engagementRate,ppw:d.m.postsPerWeek,last:d.m.lastPostDays==null?0:Date.now()-d.m.lastPostDays*DAY_MS},
+    t:(d.tags||[]).slice(0,10),at:Date.now(),q:'full'};
+  if(contacts)rec.ct={e:contacts.email||'',ig:contacts.instagram||'',yt:contacts.youtube||''};
+  return rec}
+export function poolVet(h,v){
+  return {h,ni:v.niche,sf:v.safety,fl:(v.flags||[]).filter(f=>/brand|repost|kids|adult/.test(f)),au:String(v.audience||'').slice(0,80),st:String(v.style||'').slice(0,80)}}
+export function poolTerms(s){
+  const t=new Set();
+  (s.keywords||[]).forEach(k=>{if(k.length>=5)t.add(k);k.split(' ').forEach(w=>{if(w.length>=7)t.add(w)})});
+  Object.keys(s.tags||{}).forEach(k=>{if(!/[:@]/.test(k)&&k.length>=6)t.add(k)});
+  return [...t]}
+export function poolRelevant(rec,terms){
+  const text=[rec.b,(rec.c||[]).join(' '),(rec.t||[]).join(' '),rec.ni,rec.n].join(' ').toLowerCase();
+  const flat=text.replace(/[\s_#]/g,'');
+  return terms.some(x=>text.includes(x)||(!x.includes(' ')?false:flat.includes(x.replace(/\s/g,''))))}
+export function poolSkip(brief,rec){
+  if(rec.fl&&rec.fl.length)return 'known: '+rec.fl[0];
+  if(rec.sf==='risk')return 'known brand-safety risk';
+  if(rec.m&&rec.m.last&&Date.now()-rec.m.last>(brief.max_inactive_days+60)*DAY_MS)return 'inactive';
+  if(brief.strict_language&&brief.languages.length&&rec.l&&rec.q==='full'&&!brief.languages.includes(rec.l))return 'language: '+rec.l;
+  return gate(brief,{f:rec.f,priv:false,sig:rec.b||'',nick:rec.n||''})}
+export function fromPool(rec){
+  return {f:rec.f||0,hearts:rec.hv||0,vids:rec.v||0,sig:rec.b||'',nick:rec.n||'',ver:false,priv:false,avatar:'',
+    cap:(rec.c||[]).slice(0,4),views:[],lang:rec.l?[rec.l]:[],via:['pool'],pool:true,known:rec.ni||''}}
