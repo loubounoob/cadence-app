@@ -7,6 +7,12 @@ on:
 
 jobs:
   research:
+    # several machines in parallel: each leases one shard of a job (different
+    # IP each, shared queue and dedupe through the app — see api/research.js)
+    strategy:
+      fail-fast: false
+      matrix:
+        slot: [0, 1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
@@ -19,6 +25,7 @@ jobs:
         env:
           CADENCE_URL: ${{ secrets.CADENCE_URL }}
           FREE_HARVEST_SECRET: ${{ secrets.FREE_HARVEST_SECRET }}
+          SHARD_SLOT: ${{ matrix.slot }}
         run: node harvest/research-peek.mjs
       - name: Install Playwright
         if: steps.peek.outputs.work == 'true'
@@ -31,4 +38,5 @@ jobs:
         env:
           CADENCE_URL: ${{ secrets.CADENCE_URL }}
           FREE_HARVEST_SECRET: ${{ secrets.FREE_HARVEST_SECRET }}
+          SHARD_SLOT: ${{ matrix.slot }}
         run: node harvest/research-worker.mjs
