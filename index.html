@@ -6338,7 +6338,7 @@ function rsRenderDetail(){
       <div class="pc"><div class="t">Triaged · Haiku</div><div class="big">${num(s.triaged||0)}</div><div class="sm2">${num(s.triagePassed||0)} passed · ${num(s.gated||0)} filtered by rules</div></div>
       <div class="pc"><div class="t">Vetted in depth</div><div class="big">${num(s.vetted||0)}</div><div class="sm2">${num(s.dossiers||0)} dossiers · ${num(s.escalated||0)} re-read by Sonnet · ${num(s.rejected||0)} rejected</div></div>
     </div>
-    ${q.triage||q.dossier||q.vetting?`<div class="hd" style="margin-top:8px">In the pipeline: ${num(q.triage||0)} awaiting triage · ${num(q.dossier||0)} awaiting dossier · ${num(q.vetting||0)} awaiting vetting</div>`:''}
+    ${['queued','running'].includes(j.status)&&(q.triage||q.dossier||q.vetting)?`<div class="hd" style="margin-top:8px">In the pipeline: ${num(q.triage||0)} awaiting triage · ${num(q.dossier||0)} awaiting dossier · ${num(q.vetting||0)} awaiting vetting</div>`:''}
     ${strat.persona?`<div class="hd" style="margin-top:10px"><b>Target:</b> ${esc(strat.persona)}</div>`:''}
     ${(strat.notes||[]).length?`<div class="note" style="margin-top:10px"><b>Supervisor</b><br>${strat.notes.slice(-4).map(esc).join('<br>')}</div>`:''}
     ${j.report?`<div class="note" style="margin-top:10px"><b>Report</b><br>${rsMd(j.report)}</div>`:''}
@@ -6351,10 +6351,10 @@ function rsRenderDetail(){
     <div class="sh"><b style="font-weight:500">${num(rows.length)} creators${rows.length!==all.length?` <span class="hd">of ${num(all.length)}</span>`:''}</b>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <input placeholder="Search…" style="width:150px" value="${esc(RS.filter.q)}" oninput="RS.filter.q=this.value;RS.shown=150;rsRenderDetail();this.focus()">
-        <select onchange="RS.filter.min=+this.value;rsRenderDetail()">${[0,70,80,90].map(v=>`<option value="${v}" ${RS.filter.min===v?'selected':''}>${v?'score ≥ '+v:'any score'}</option>`).join('')}</select>
-        <select onchange="RS.filter.sort=this.value;rsRenderDetail()">${[['score','best fit'],['followers','followers'],['views','median views'],['er','engagement']].map(([v,n])=>`<option value="${v}" ${RS.filter.sort===v?'selected':''}>${n}</option>`).join('')}</select>
-        <label class="hd"><input type="checkbox" ${RS.filter.email?'checked':''} onchange="RS.filter.email=this.checked;rsRenderDetail()"> email</label>
-        <label class="hd"><input type="checkbox" ${RS.filter.clean?'checked':''} onchange="RS.filter.clean=this.checked;rsRenderDetail()"> brand-safe only</label>
+        <select style="width:auto" onchange="RS.filter.min=+this.value;rsRenderDetail()">${[0,70,80,90].map(v=>`<option value="${v}" ${RS.filter.min===v?'selected':''}>${v?'score ≥ '+v:'any score'}</option>`).join('')}</select>
+        <select style="width:auto" onchange="RS.filter.sort=this.value;rsRenderDetail()">${[['score','best fit'],['followers','followers'],['views','median views'],['er','engagement']].map(([v,n])=>`<option value="${v}" ${RS.filter.sort===v?'selected':''}>${n}</option>`).join('')}</select>
+        <label class="hd"><input type="checkbox" style="width:auto;margin:0 4px 0 0" ${RS.filter.email?'checked':''} onchange="RS.filter.email=this.checked;rsRenderDetail()"> email</label>
+        <label class="hd"><input type="checkbox" style="width:auto;margin:0 4px 0 0" ${RS.filter.clean?'checked':''} onchange="RS.filter.clean=this.checked;rsRenderDetail()"> brand-safe only</label>
         <button class="btn sm" onclick="rsExportCsv()">Export CSV</button>
         <button class="btn sm p" onclick="rsSaveLists()">Save to Lists</button></div></div>
     <table><thead><tr><th>Creator</th><th class="r">Followers</th><th class="r">Median views</th><th class="r">Eng.</th><th>Fit</th><th>Contact</th></tr></thead><tbody>
