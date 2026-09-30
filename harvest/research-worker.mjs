@@ -104,8 +104,10 @@ const pendingResults=[];
 
 async function plan(){
   log('Planning the search with Sonnet…');
-  const out=await ai('sonnet',C.PLAN_SYS,C.planPrompt(BRIEF),4000);
+  let out={};
+  for(let i=0;i<2;i++){try{out=await ai('sonnet',C.PLAN_SYS,C.planPrompt(BRIEF),4000);break}catch(e){log('Planning answer unreadable, retrying: '+e.message.slice(0,80))}}
   const n=C.applyPlan(S,BRIEF,out);
+  if(!n&&!Object.keys(S.tags).length)throw new Error('no hashtags to explore — add seed hashtags to the brief');
   BRIEF.example_creators.forEach(h=>{if(!S.seen[h]){S.seen[h]='m';S.probeQ.push(h)}});
   log(`Plan ready — ${n} hashtags to explore${BRIEF.example_creators.length?`, plus ${BRIEF.example_creators.length} reference creators`:''}. ${S.persona?'Target: '+S.persona:''}`)}
 

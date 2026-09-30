@@ -367,13 +367,15 @@ export const PLAN_SYS=`You plan TikTok creator research for brands. You know how
 
 export function planPrompt(brief){
   return `BRIEF\n${briefText(brief)}\n\nPlan the research.
-- "hashtags": 90–140 hashtags, lowercase, no #, no spaces, no brand names, spread ~10% head / 45% mid / 45% long-tail, covering every sub-niche, format (tutorials, routines, transformations, vlogs, coaching, competitions…) and market language in the brief. Each {"tag","pri":1-100} — pri = how likely its authors are exactly the brief's creators.
+- "hashtags": ONE string of 80–120 space-separated entries "tag:pri" (e.g. "gymtok:70 musculationfemme:90"), lowercase, no #, no brand names, spread ~10% head / 45% mid / 45% long-tail, covering every sub-niche, format (tutorials, routines, transformations, vlogs, coaching, competitions…) and market language in the brief. pri 1-100 = how likely its authors are exactly the brief's creators.
 - "disqualifiers": up to 25 lowercase words/short phrases that, if present in a bio or name, prove a creator is NOT a fit (e.g. shop, official, clips, fanpage, compilation, onlyfans...), tailored to this brief.
 - "persona": one sentence describing the ideal creator.
-JSON: {"hashtags":[...],"disqualifiers":[...],"persona":"..."}`}
+JSON: {"hashtags":"tag:pri tag:pri ...","disqualifiers":[...],"persona":"..."}`}
 
 export function applyPlan(s,brief,out){
-  const n=addTags(s,(out&&out.hashtags)||[],'plan',60);
+  let h=(out&&out.hashtags)||[];
+  if(typeof h==='string')h=h.split(/[\s,]+/).filter(Boolean).map(x=>{const [tag,pri]=x.split(':');return {tag,pri:Number(pri)||60}});
+  const n=addTags(s,h,'plan',60);
   brief._disq=[...new Set((out&&out.disqualifiers||[]).map(x=>String(x).toLowerCase().trim()).filter(x=>x.length>2))].slice(0,25);
   s.disq=brief._disq;s.persona=String(out&&out.persona||'').slice(0,300);s.planned=true;
   return n}
@@ -381,8 +383,20 @@ export function applyPlan(s,brief,out){
 /* ── helpers for the loop ───────────────────────────────────────────────── */
 export function parseJSON(text){
   const t=String(text||'');const a=t.indexOf('{'),b=t.lastIndexOf('}');
-  if(a<0||b<=a)throw new Error('no JSON in model answer');
-  return JSON.parse(t.slice(a,b+1))}
+  if(a<0)throw new Error('no JSON in model answer');
+  try{if(b>a)return JSON.parse(t.slice(a,b+1))}catch(e){}
+  return repairJSON(t.slice(a))}
+/* A long answer cut off by max_tokens: keep every complete element. */
+export function repairJSON(t){
+  for(let end=t.length;end>1;end--){
+    const ch=t[end-1];if(ch!=='}'&&ch!==']'&&ch!=='"'&&!/\d/.test(ch))continue;
+    let cut=t.slice(0,end);const st=[];let inStr=false,esc=false;
+    for(const c of cut){if(inStr){if(esc)esc=false;else if(c==='\\')esc=true;else if(c==='"')inStr=false;continue}
+      if(c==='"')inStr=true;else if(c==='{'||c==='[')st.push(c);else if(c==='}'||c===']')st.pop()}
+    if(inStr)continue;
+    const close=st.reverse().map(c=>c==='{'?'}':']').join('');
+    try{return JSON.parse(cut+close)}catch(e){}}
+  throw new Error('unreadable JSON in model answer')}
 
 // $ per 1M tokens (input, output) — for the progress panel only
 export const PRICE={haiku:[1,5],sonnet:[3,15]};
