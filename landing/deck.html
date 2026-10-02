@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta name="robots" content="noindex"><link rel="icon" href="/favicon.ico"><meta property="og:image" content="https://www.cadenceinfluence.com/og-image.png">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cadence — Millions of views. Zero risk.</title>
+<style>
+:root{--ink:#0B0B14;--ink2:#15151F;--lime:#C6FF3D;--vio:#7B5CFF;--off:#F4F4F0;--mut:#8A8A9A;--line:#26263A}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-snap-type:y mandatory}
+body{background:#05050A;color:var(--off);font-family:-apple-system,"SF Pro Display","Inter","Helvetica Neue",Arial,sans-serif}
+.slide{width:min(100vw,177.78vh);aspect-ratio:16/9;margin:0 auto 24px;background:var(--ink);position:relative;overflow:hidden;scroll-snap-align:center;padding:5.5% 7%;display:flex;flex-direction:column;justify-content:center;font-size:clamp(9px,1.25vw,22px)}
+@media (min-aspect-ratio:16/9){.slide{font-size:clamp(9px,2.22vh,22px)}}
+.slide:first-child{margin-top:24px}
+.logo{position:absolute;top:5.5%;left:7%;display:flex;align-items:center;gap:.6em;font-weight:800;letter-spacing:-.02em;font-size:1.15em}
+.num{position:absolute;bottom:5%;right:7%;color:var(--mut);font-size:.8em}
+.bars{display:flex;align-items:flex-end;gap:.18em;height:1.2em}
+.bars i{display:block;width:.22em;border-radius:.1em;background:var(--lime)}
+.eyebrow{color:var(--lime);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:.85em;margin-bottom:1.2em}
+h1{font-size:4.6em;line-height:1.02;letter-spacing:-.035em;font-weight:800}
+h2{font-size:2.9em;line-height:1.08;letter-spacing:-.03em;font-weight:800;margin-bottom:.6em}
+.hl{color:var(--lime)}
+p.lead{font-size:1.35em;color:#C9C9D4;max-width:36em;line-height:1.45;margin-top:1.1em}
+.row{display:grid;gap:1.2em}
+.c3{grid-template-columns:repeat(3,1fr)}.c4{grid-template-columns:repeat(4,1fr)}.c2{grid-template-columns:1fr 1fr}
+.box{background:var(--ink2);border:1px solid var(--line);border-radius:1.1em;padding:1.4em}
+.box .k{font-size:2.4em;font-weight:800;letter-spacing:-.03em;color:var(--lime);line-height:1}
+.box h3{font-size:1.3em;margin:.5em 0 .35em}
+.box p{color:#B9B9C6;font-size:1em;line-height:1.4}
+.step{font-size:.85em;font-weight:800;color:var(--ink);background:var(--lime);width:2.2em;height:2.2em;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.big{font-size:9em;font-weight:900;letter-spacing:-.05em;line-height:.9;color:var(--lime)}
+.guarantee{display:inline-flex;align-items:center;gap:.6em;border:2px solid var(--lime);border-radius:99px;padding:.5em 1.2em;color:var(--lime);font-weight:700;font-size:1.1em;margin-top:1.4em;align-self:flex-start}
+.ladder{display:grid;grid-template-columns:repeat(5,1fr);gap:1em;align-items:end;margin-top:.4em}
+.rung{background:var(--ink2);border:1px solid var(--line);border-radius:1.1em;padding:1.2em 1em}
+.rung:nth-child(2){margin-bottom:1.6em}.rung:nth-child(3){margin-bottom:3.2em}.rung:nth-child(4){margin-bottom:4.8em}.rung:nth-child(5){margin-bottom:6.4em}
+.rung.top{border-color:var(--lime)}
+.rung .views{font-size:2.4em;font-weight:800;letter-spacing:-.03em;color:var(--lime);line-height:1}
+.rung .views small{font-size:.4em;color:var(--mut);font-weight:600;letter-spacing:0;margin-left:.3em}
+.rung .cpm{font-size:1.15em;font-weight:700;margin-top:.6em}
+.rung .tot{color:#B9B9C6;font-size:.9em;margin-top:.2em}
+.rung .badge{display:inline-block;font-size:.7em;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--lime);margin-bottom:.7em}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:1.5em;align-items:center}
+.vs .box{text-align:center;padding:1.8em 1.4em}
+.vs .k{font-size:3.8em}
+.vs .ads .k{color:var(--mut)}
+.vsx{font-weight:900;font-size:1.6em;color:var(--mut)}
+.funnel{display:flex;flex-direction:column;align-items:center;gap:.6em}
+.fl{background:var(--ink2);border:1px solid var(--line);border-radius:1.1em;padding:1em 1.4em;text-align:center}
+.fl.on{border-color:var(--lime)}
+.fl .tg{display:block;font-size:.72em;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--lime);margin-bottom:.3em}
+.fl b{display:block;font-size:1.2em}.fl span.d{display:block;font-size:.92em;color:#B9B9C6;margin-top:.2em}
+.timeline{display:grid;grid-template-columns:repeat(5,1fr);position:relative;margin-top:1em}
+.timeline:before{content:"";position:absolute;top:1.1em;left:0;right:0;height:2px;background:var(--line)}
+.tl{position:relative;padding-right:1em}
+.tl .dot{width:2.2em;height:2.2em;border-radius:50%;background:var(--ink);border:2px solid var(--lime);position:relative;z-index:1}
+.tl.setup .dot{border-color:var(--vio)}.tl.setup .when{color:var(--vio)}
+.tl.end .dot{background:var(--lime)}
+.tl .when{color:var(--lime);font-weight:700;font-size:.9em;margin:1em 0 .3em}
+.tl h3{font-size:1.2em;margin-bottom:.3em}
+.tl p{color:#B9B9C6;line-height:1.4;font-size:.95em}
+ul.ticks{list-style:none;margin-top:.4em}
+ul.ticks li{padding-left:1.6em;position:relative;margin:.55em 0;font-size:1.12em;color:#D6D6DE}
+ul.ticks li:before{content:"✓";position:absolute;left:0;color:var(--lime);font-weight:900}
+.glow{position:absolute;width:60%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#7B5CFF55,transparent 65%);right:-15%;top:-25%;pointer-events:none}
+.glow.l{background:radial-gradient(circle,#C6FF3D2e,transparent 65%);left:-20%;bottom:-40%;top:auto;right:auto}
+.cta{display:inline-block;background:var(--lime);color:var(--ink);font-weight:800;border-radius:99px;padding:.8em 1.8em;font-size:1.3em;margin-top:1.6em}
+.small{color:var(--mut);font-size:.85em;margin-top:1.2em}
+.nav{position:fixed;bottom:16px;right:16px;color:#666;font:12px -apple-system,sans-serif}
+@media print{@page{size:1600px 900px;margin:0}html,body{background:var(--ink)}.slide{width:1600px;height:900px;margin:0;page-break-after:always;font-size:22px}.nav{display:none}}
+</style>
+</head>
+<body>
+
+<section class="slide"><div class="glow"></div><div class="glow l"></div>
+  <div class="logo">LOGO</div>
+  <div class="eyebrow">Creator marketing, at scale</div>
+  <h1>Millions of views.<br><span class="hl">Zero risk.</span></h1>
+  <p class="lead">Hundreds of real creators talking about your brand on TikTok and Instagram Reels. Guaranteed views, or your money back.</p>
+  <div class="num">01</div></section>
+
+
+<section class="slide"><div class="logo">LOGO</div>
+  <div class="eyebrow">The problem</div>
+  <h2>Ads keep getting <span class="hl">more expensive.</span><br>And people keep skipping them.</h2>
+  <div class="row c3">
+    <div class="box"><div class="k">$5–10</div><h3>per 1,000 views</h3><p>What brands typically pay for paid views on TikTok and Reels.</p></div>
+    <div class="box"><div class="k">Skip</div><h3>Cold audiences</h3><p>Ads shown to people who've never heard of you get scrolled past.</p></div>
+    <div class="box"><div class="k">Trust</div><h3>Creators open the door</h3><p>People discover and trust brands through creators they follow.</p></div>
+  </div>
+  <div class="num">02</div></section>
+
+
+<section class="slide"><div class="glow"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">Our approach</div>
+  <div class="big">100–500</div>
+  <h2 style="margin-top:.3em">creators talking about your brand<br><span class="hl">at the same time.</span></h2>
+  <p class="lead">Not one expensive influencer. A wave of authentic videos, hand‑picked for your niche, your audience and your image.</p>
+  <div class="num">03</div></section>
+
+
+<section class="slide"><div class="glow l"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">Creators + ads</div>
+  <h2>We fill your funnel.<br><span class="hl">Your ads convert it.</span></h2>
+  <div class="row c2" style="align-items:center">
+    <div class="funnel">
+      <div class="fl on" style="width:100%"><span class="tg">Top · Cadence</span><b>Millions discover you</b><span class="d">through creators they trust</span></div>
+      <div class="fl" style="width:84%"><span class="tg">Middle · your ads</span><b>Retarget a warm audience</b><span class="d">people who already know you</span></div>
+      <div class="fl" style="width:68%"><span class="tg">Bottom · sales</span><b>More conversions</b><span class="d">for every ad dollar</span></div>
+    </div>
+    <ul class="ticks">
+      <li>Creators don't replace your ads. They make them work harder.</li>
+      <li>Warm audiences convert better than cold ones.</li>
+      <li>More people know you → every ad dollar goes further.</li>
+    </ul>
+  </div>
+  <div class="num">04</div></section>
+
+
+<section class="slide"><div class="logo">LOGO</div>
+  <div class="eyebrow">How it works</div>
+  <h2>Three steps. <span class="hl">We do the heavy lifting.</span></h2>
+  <div class="row c3">
+    <div class="box"><div class="step">1</div><h3>We find the creators</h3><p>We vet hundreds of creators: right niche, real audience, brand‑safe content. You approve the list.</p></div>
+    <div class="box"><div class="step">2</div><h3>You ship the product</h3><p>We handle outreach. You send one package per month to each creator who said yes.</p></div>
+    <div class="box"><div class="step">3</div><h3>Watch the views roll in</h3><p>Creators post. You follow every video and every view live on your dashboard.</p></div>
+  </div>
+  <div class="num">05</div></section>
+
+
+<section class="slide"><div class="logo">LOGO</div>
+  <div class="eyebrow">Your campaign</div>
+  <h2>2 weeks of setup. <span class="hl">90 days of views.</span></h2>
+  <div class="timeline">
+    <div class="tl setup"><div class="dot"></div><div class="when">Setup · week 1</div><h3>Creator list</h3><p>We deliver vetted creators. You approve them.</p></div>
+    <div class="tl setup"><div class="dot"></div><div class="when">Setup · week 2</div><h3>Products ship</h3><p>Creators sign up for a 3‑month partnership. You ship.</p></div>
+    <div class="tl"><div class="dot"></div><div class="when">Day 0</div><h3>Kickoff</h3><p>Creators have the product. The 90 days start.</p></div>
+    <div class="tl"><div class="dot"></div><div class="when">Days 1–90</div><h3>Views grow</h3><p>Videos go live. Follow it all on your dashboard.</p></div>
+    <div class="tl end"><div class="dot"></div><div class="when">Day 90</div><h3>Results</h3><p>Final count. Bonuses — or your refund.</p></div>
+  </div>
+  <div class="num">06</div></section>
+
+
+<section class="slide"><div class="logo">LOGO</div>
+  <div class="eyebrow">Why Cadence</div>
+  <h2>Everything a brand wants. <span class="hl">Nothing it fears.</span></h2>
+  <div class="row c4">
+    <div class="box"><div class="k">×1000</div><h3>Volume</h3><p>Hundreds of creators per campaign, not a handful.</p></div>
+    <div class="box"><div class="k">$</div><h3>Lowest cost per view</h3><p>A fraction of what ads cost, from day one.</p></div>
+    <div class="box"><div class="k">✓</div><h3>Brand‑safe selection</h3><p>Every creator is vetted: real audience, right niche, positive image.</p></div>
+    <div class="box"><div class="k">↺</div><h3>Pay for results</h3><p>Guaranteed views or refunded. Bonuses only when it works.</p></div>
+  </div>
+  <div class="num">07</div></section>
+
+
+<section class="slide"><div class="glow"></div><div class="glow l"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">The offer</div>
+  <h2>One payment.<br><span class="hl">Up to 50 million views.</span></h2>
+  <div class="row c2" style="max-width:48em">
+    <div class="box"><div class="k">$6,000</div><h3>one‑time, upfront</h3><p>Covers the full campaign. No monthly fee.</p></div>
+    <div class="box"><div class="k">3M → 50M</div><h3>views in 90 days</h3><p>3M guaranteed. Up to 50M with performance bonuses.</p></div>
+  </div>
+  <div class="guarantee">↺ Under 3M views? 100% refunded.</div>
+  <div class="num">08</div></section>
+
+
+<section class="slide"><div class="logo">LOGO</div>
+  <div class="eyebrow">Performance bonuses</div>
+  <h2 style="margin-bottom:.4em">You only pay <span class="hl">for results.</span></h2>
+  <div class="ladder">
+    <div class="rung"><span class="badge">Guaranteed</span><div class="views">3M<small>views</small></div><div class="cpm">$2.00 / 1K</div><div class="tot">$6,000 upfront</div></div>
+    <div class="rung"><span class="badge">Bonus</span><div class="views">5M<small>views</small></div><div class="cpm">$1.90 / 1K</div><div class="tot">+$3,500</div></div>
+    <div class="rung"><span class="badge">Bonus</span><div class="views">10M<small>views</small></div><div class="cpm">$1.75 / 1K</div><div class="tot">+$8,000</div></div>
+    <div class="rung"><span class="badge">Bonus</span><div class="views">20M<small>views</small></div><div class="cpm">$1.60 / 1K</div><div class="tot">+$14,500</div></div>
+    <div class="rung top"><span class="badge">Best value</span><div class="views">50M<small>views</small></div><div class="cpm">$1.40 / 1K</div><div class="tot">+$38,000</div></div>
+  </div>
+  <p class="small">Bonuses are only paid when a milestone is reached, based on campaign views within the 90 days.</p>
+  <div class="num">09</div></section>
+
+
+<section class="slide"><div class="glow l"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">Your product investment</div>
+  <h2>$30,000 of product value.<br><span class="hl">About $7,500 real cost.</span></h2>
+  <div class="row c2" style="align-items:start">
+    <div class="box">
+      <ul class="ticks" style="margin-top:0">
+        <li>100 creators</li>
+        <li>1 package per creator, per month</li>
+        <li>$100 retail value per package</li>
+        <li>3 months of campaign</li>
+      </ul>
+      <div style="border-top:1px solid var(--line);margin-top:1em;padding-top:1em;display:flex;justify-content:space-between;align-items:baseline;gap:1em">
+        <div><div style="color:var(--mut);font-size:.85em">Retail value</div><div class="k" style="font-size:2em;color:var(--off)">$30,000</div></div>
+        <div style="text-align:right"><div style="color:var(--mut);font-size:.85em">Your real cost</div><div class="k" style="font-size:2em">$7,500</div></div>
+      </div>
+    </div>
+    <ul class="ticks">
+      <li>Creators receive generous packages: more motivation, more videos.</li>
+      <li>They use your product every day, during and after the campaign.</li>
+      <li>You give at retail value, you pay at cost price.</li>
+      <li>Every product can be seen hundreds of thousands of times on camera.</li>
+    </ul>
+  </div>
+  <p class="small">Example based on 100 creators and a 75% gross margin. Scales with the number of creators.</p>
+  <div class="num">10</div></section>
+
+
+<section class="slide"><div class="glow"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">Do the math</div>
+  <h2>Same total budget. <span class="hl">Very different result.</span></h2>
+  <p class="lead" style="margin:-.6em 0 1.4em">$13,500 all‑in: $6,000 Cadence + $7,500 of products at cost.</p>
+  <div class="vs">
+    <div class="box ads"><h3 style="color:var(--mut)">Paid ads</h3><div class="k">1.8M</div><p>views at ~$7.50 per 1,000,<br>mostly to people who don't know you yet.</p></div>
+    <div class="vsx">vs</div>
+    <div class="box" style="border-color:var(--lime)"><h3 class="hl">Cadence</h3><div class="k">3M → 50M</div><p>3M guaranteed or refunded. Up to 50M with bonuses.<br>Plus your product in the hands of 100+ creators.</p></div>
+  </div>
+  <p class="small" style="text-align:center">Ad cost based on typical TikTok / Reels rates of $5–10 per 1,000 views. Actual rates vary by brand and audience.</p>
+  <div class="num">11</div></section>
+
+
+<section class="slide"><div class="glow l"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">After day 90</div>
+  <h2>Keep your best creators.<br><span class="hl">Ambassador program.</span></h2>
+  <div class="row c2">
+    <ul class="ticks">
+      <li>We keep working with your top performers</li>
+      <li>We send them your new products and launches</li>
+      <li>Your dashboard keeps tracking every view</li>
+      <li>Billed monthly. No minimum. Cancel anytime.</li>
+    </ul>
+    <div class="vs" style="grid-template-columns:1fr auto 1fr;gap:.8em">
+      <div class="box" style="border-color:var(--lime)"><h3 class="hl">Cadence</h3><div class="k" style="font-size:3em">$1</div><p>per 1,000 views</p></div>
+      <div class="vsx">vs</div>
+      <div class="box ads"><h3 style="color:var(--mut)">Ads</h3><div class="k" style="font-size:3em">$5–10</div><p>per 1,000 views</p></div>
+    </div>
+  </div>
+  <div class="num">12</div></section>
+
+
+<section class="slide"><div class="logo">LOGO</div>
+  <div class="eyebrow">Simple, clear terms</div>
+  <h2>No fine print <span class="hl">surprises.</span></h2>
+  <div class="row c2">
+    <ul class="ticks">
+      <li>One upfront payment of $6,000</li>
+      <li>3M views in 90 days, or 100% refunded</li>
+      <li>Bonuses only when a milestone is reached</li>
+      <li>Only campaign videos count, within the 90 days</li>
+    </ul>
+    <ul class="ticks">
+      <li>You approve the creator list within 7 days</li>
+      <li>You ship products within the 2‑week setup</li>
+      <li>Products at your cost: 1 package / creator / month</li>
+      <li>The 90 days start once creators have the product</li>
+      <li>Views measured on your live dashboard</li>
+    </ul>
+  </div>
+  <div class="num">13</div></section>
+
+
+<section class="slide"><div class="glow"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">Selective by design</div>
+  <h2>We choose our brands.<br><span class="hl">That's how we guarantee results.</span></h2>
+  <div class="row c2">
+    <div class="box"><h3 class="hl">What we look for</h3><ul class="ticks">
+      <li>A product creators are proud to show</li>
+      <li>A trustworthy brand, with honest claims</li>
+      <li>The ability to ship hundreds of products in 2 weeks</li>
+    </ul></div>
+    <div class="box"><h3 class="hl">What we hold ourselves to</h3><ul class="ticks">
+      <li>One campaign per brand, per year</li>
+      <li>A limited number of campaigns at a time</li>
+      <li>Every brand reviewed before we commit</li>
+    </ul></div>
+  </div>
+  <div class="num">14</div></section>
+
+
+<section class="slide"><div class="glow"></div><div class="glow l"></div><div class="logo">LOGO</div>
+  <div class="eyebrow">Next step</div>
+  <h1>Worst case:<br><span class="hl">you get your money back.</span></h1>
+  <p class="lead">Book a 20‑minute call. We'll check if your brand qualifies and show you real creators from your niche.</p>
+  <div><a class="cta" href="https://www.cadenceinfluence.com/call" style="text-decoration:none">See if your brand qualifies →</a></div><p class="small" style="margin-top:22px;font-size:1em;color:#C9C9D4">cadenceinfluence.com · hello@cadenceinfluence.com</p><div></div>
+  <div class="num">15</div></section>
+
+<div class="nav">Scroll or ↑ ↓ · Print → Save as PDF</div>
+<script>
+const L='<div class="bars"><i style="height:40%"></i><i style="height:75%"></i><i style="height:100%"></i><i style="height:60%"></i><i style="height:85%"></i></div>cadence';
+document.querySelectorAll('.logo').forEach(e=>e.innerHTML=L);
+document.addEventListener('keydown',e=>{const s=[...document.querySelectorAll('.slide')];const y=window.scrollY+innerHeight/2;let i=s.findIndex(x=>x.offsetTop+x.offsetHeight>y);if(['ArrowDown','ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();s[Math.min(i+1,s.length-1)].scrollIntoView({behavior:'smooth',block:'center'})}if(['ArrowUp','ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();s[Math.max(i-1,0)].scrollIntoView({behavior:'smooth',block:'center'})}});
+</script>
+</body>
+</html>

@@ -361,12 +361,12 @@ footer{padding:40px 0 28px}
 <section id="faq" style="padding-top:0"><div class="wrap" style="max-width:900px"><div class="sechead"><div class="eyebrow rv">FAQ</div><h2 class="split">Réponses rapides.</h2></div><div class="rv"><details><summary>Ça remplace nos pubs ?</summary><p>Non. Ça réchauffe votre audience pour que vos pubs convertissent mieux.</p></details><details><summary>Qui paie les créateurs ?</summary><p>Votre produit : un colis par mois et par créateur.</p></details><details><summary>Et si les vues ne viennent pas ?</summary><p>Vous êtes intégralement remboursé.</p></details><details><summary>Quelles plateformes ?</summary><p>TikTok et Instagram Reels.</p></details><details><summary>On démarre quand ?</summary><p>2 semaines après validation.</p></details></div></div></section>
 
 <section id="apply" style="background:var(--ink2);border-top:1px solid var(--line)"><div class="wrap apply"><div><div class="eyebrow rv">Candidature</div><h2 class="split">Votre marque est-elle<br><span class="hl">éligible ?</span></h2><p class="lead rv d2">Réponse sous 48 h. Places limitées chaque trimestre.</p></div>
-<form class="rv d1">
-<div><label>Marque</label><input required></div><div><label>Site web</label><input placeholder="https://"></div>
-<div><label>Chiffre d'affaires annuel</label><select required><option value="">Choisir</option><option>Moins de 10 M$</option><option>10 – 50 M$</option><option>50 – 200 M$</option><option>Plus de 200 M$</option></select></div><div><label>Catégorie</label><input></div>
-<div><label>Votre nom</label><input required></div><div><label>Poste</label><input></div>
-<div class="full"><label>Email pro</label><input type="email" required></div>
-<div class="full"><label>Autre chose ?</label><textarea></textarea></div>
+<form class="rv d1"><input name="company_site" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+<div><label>Marque</label><input name="brand" required></div><div><label>Site web</label><input name="website" placeholder="https://"></div>
+<div><label>Chiffre d'affaires annuel</label><select name="revenue" required><option value="">Choisir</option><option>Moins de 10 M$</option><option>10 – 50 M$</option><option>50 – 200 M$</option><option>Plus de 200 M$</option></select></div><div><label>Catégorie</label><input name="category"></div>
+<div><label>Votre nom</label><input name="name" required></div><div><label>Poste</label><input name="role"></div>
+<div class="full"><label>Email pro</label><input name="email" type="email" required></div>
+<div class="full"><label>Autre chose ?</label><textarea name="message"></textarea></div>
 <div class="full"><button class="btn" type="submit">Candidater →</button><p class="small" style="margin-top:12px">Utilisé uniquement pour répondre à votre candidature.</p></div>
 <div class="ok">Merci — réponse sous 48 heures.</div></form></div></section>
 
@@ -415,5 +415,5 @@ if(fl){const st=fl.querySelectorAll('.stage');const vc=fl.querySelector('.vc');c
 // magnetic buttons
 document.querySelectorAll('.btn').forEach(b=>{b.addEventListener('pointermove',e=>{const r=b.getBoundingClientRect();b.style.transform=`translate(${(e.clientX-r.left-r.width/2)*.18}px,${(e.clientY-r.top-r.height/2)*.25}px)`});b.addEventListener('pointerleave',()=>b.style.transform='')});
 // form
-const f=document.querySelector('form');if(f)f.addEventListener('submit',e=>{e.preventDefault();f.querySelector('.ok').style.display='block';f.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=true)});
+const f=document.querySelector('form');if(f){f.addEventListener('submit',async e=>{e.preventDefault();const b=f.querySelector('button[type=submit]');const t=b.textContent;b.disabled=true;b.textContent='…';const d=Object.fromEntries(new FormData(f).entries());d.lang=document.documentElement.lang;d.page=location.href;try{const r=await fetch('/api/apply',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw 0;try{sessionStorage.setItem('cad_name',(d.name||'').split(' ')[0]);sessionStorage.setItem('cad_brand',d.brand||'')}catch(_){}location.href=(d.lang==='fr'?'/fr/call':'/call')+'?applied=1'}catch(_){b.disabled=false;b.textContent=t;f.querySelector('.ok').style.display='block';f.querySelector('.ok').textContent=(document.documentElement.lang==='fr'?"Un problème est survenu. Écrivez-nous à hello@cadenceinfluence.com":"Something went wrong. Email us at hello@cadenceinfluence.com")}})}
 </script></body></html>

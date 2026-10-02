@@ -4,6 +4,14 @@
     {
       "source": "/fr",
       "destination": "/index-fr"
+    },
+    {
+      "source": "/fr/call",
+      "destination": "/call-fr"
+    },
+    {
+      "source": "/fr/deck",
+      "destination": "/deck-fr"
     }
   ]
 }
