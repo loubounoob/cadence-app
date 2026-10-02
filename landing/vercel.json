@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/fr",
-      "destination": "/index-fr.html"
+      "destination": "/index-fr"
     }
   ]
 }
