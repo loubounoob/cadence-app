@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/fr",
+      "destination": "/index-fr.html"
+    }
+  ]
+}
