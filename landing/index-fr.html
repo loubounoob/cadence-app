@@ -223,7 +223,105 @@ footer .wrap{display:grid;grid-template-columns:1.3fr 1fr;gap:40px}
 .go #fan .fp{stroke-dashoffset:0}.go #fan .fr{opacity:.18}.go #fan .fc{transform:scale(1)}.go #fan .fv{opacity:1}
 .go #fan .fv2{animation:pulse 2.4s 2s ease-out infinite}
 @keyframes pulse{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(2.2)}}
-</style></head><body><div class="grain"></div><div class="cursor"></div><div class="progress"></div>
+/*MOBILE*/@media (max-width:640px){
+body{font-size:16px}
+.cursor,.grain{display:none}
+.wrap{padding:0 20px}
+nav .wrap{height:62px}
+.btn{padding:11px 18px;font-size:14px}
+section{padding:64px 0}
+.sechead{margin-bottom:28px}
+h1{font-size:clamp(40px,11.5vw,52px)}
+h2{font-size:clamp(30px,8.6vw,38px)}
+.lead{font-size:16.5px;margin-top:14px}
+.eyebrow{font-size:11px;margin-bottom:14px}
+/* hero */
+.hero{min-height:0;padding:92px 0 36px}
+.heroctas{margin-top:22px;gap:10px}
+.heroctas .btn{flex:1;justify-content:center}
+.chips{flex-wrap:nowrap;overflow-x:auto;margin:22px -20px 0;padding:0 20px;scrollbar-width:none;gap:8px}
+.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;font-size:13px;padding:7px 12px}
+.wall{height:250px;transform:none;margin-top:26px;gap:10px}
+.col{gap:10px}
+.ph{border-radius:16px}
+/* flow */
+.flow{grid-template-columns:1fr;gap:0}
+.stage{flex-direction:row;align-items:center;gap:16px;padding:14px;border-radius:20px}
+.sv{width:104px;height:104px;flex:none;border-radius:14px}
+.pbox{width:44px;height:58px}
+.crowd{grid-template-columns:repeat(6,1fr);gap:5px;padding:10px}
+.crowd i{width:9px;height:9px}
+.crowd i:nth-child(n+31){display:none}
+.views{width:88%}
+.vup{font-size:9px;margin-bottom:4px}
+.vc{font-size:28px}
+.vbar{height:5px;margin-top:10px}
+.sl{padding-left:0}
+.sl .sn{position:static;width:24px;height:24px;font-size:12px;margin-bottom:6px}
+.sl b{font-size:17px}
+.sl p{font-size:13.5px}
+.arrow{height:30px;transform:none}
+.arrow i{width:2px;height:100%;margin:0;background:repeating-linear-gradient(180deg,var(--lime) 0 6px,transparent 6px 12px);animation:none}
+.arrow i:after{right:-5px;top:auto;bottom:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--lime);border-bottom:0}
+/* forces: swipe carousel */
+.forces{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;margin:0 -20px;padding:0 20px 6px;scrollbar-width:none}
+.forces::-webkit-scrollbar{display:none}
+.force{flex:0 0 84%;scroll-snap-align:center;min-height:0;padding:22px;border-radius:22px}
+.force h3{font-size:24px}
+.viz{min-height:0;margin:16px 0 26px}
+.vbars{height:120px}
+.scatter{height:130px}
+.scatter span{font-size:12px;padding:5px 10px}
+.line svg{height:130px}
+.force .big{font-size:44px}
+#why .sechead:after{content:"← swipe →";display:block;color:var(--mut);font-size:12px;letter-spacing:.12em;margin-top:12px}
+html[lang=fr] #why .sechead:after{content:"← faites défiler →"}
+/* manifesto */
+.manifesto blockquote{font-size:29px}
+/* pillars compact */
+.grid3,.grid2{gap:10px}
+.grid3 .card{display:grid;grid-template-columns:48px 1fr;column-gap:14px;align-items:start;padding:18px}
+.grid3 .card .ic{grid-row:span 2;margin:0;width:48px;height:48px}
+.grid3 .card .num{display:none}
+.grid3 .card h3{font-size:19px;margin:2px 0 2px}
+.card{padding:20px;border-radius:20px}
+/* funnel */
+.funnel .fl{width:100%!important;padding:16px 18px}
+.fl b{font-size:18px}
+/* vertical timeline */
+.steps{grid-template-columns:1fr;gap:22px;position:relative}
+.track{display:block!important;left:25px;right:auto;top:10px;bottom:10px;width:2px;height:auto}
+.track i{width:100%!important;height:0;transition:height 2.2s cubic-bezier(.2,.7,.2,1)}
+.in .track i{height:100%}
+.st{display:grid;grid-template-columns:52px 1fr;column-gap:16px;padding:0}
+.st .dot{grid-row:span 3}
+.st .when{margin:2px 0 4px}
+.st h3{margin:0 0 2px}
+/* guarantee */
+.guar{padding:28px 22px;border-radius:24px;gap:24px}
+.seal{width:200px;height:200px}
+.seal .core{inset:36px}
+.seal .core b{font-size:38px}
+ul.ticks li{font-size:15.5px;margin:9px 0}
+/* quote */
+.quote{padding:26px 22px;gap:4px}
+.quote .mk{font-size:60px}
+.quote p{font-size:19px}
+/* faq */
+summary{font-size:17px}
+details{padding:18px 0}
+/* form */
+.apply{gap:24px}
+form{padding:20px;border-radius:20px;gap:12px}
+input,select,textarea{font-size:16px;padding:12px}
+form .btn{width:100%;justify-content:center}
+/* final */
+.big-cta{padding:84px 0}
+.big-cta h2{font-size:clamp(34px,10vw,44px)}
+footer{padding:40px 0 28px}
+}
+/*ENDMOBILE*/</style></head><body><div class="grain"></div><div class="cursor"></div><div class="progress"></div>
 <nav><div class="wrap"><a href="#" class="logo"><div class="bars"><i style="height:8px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:12px"></i><i style="height:17px"></i></div>cadence</a><div class="links"><a href="#why">Pourquoi</a><a href="#how">Méthode</a><a href="#guarantee">Garantie</a><a href="#team">Équipe</a><a href="#faq">FAQ</a></div><div class="navr"><a class="lang" href="/">EN</a><a class="btn" href="#apply">Candidater</a></div></div></nav>
 
 <header class="hero"><div class="glow g1"></div><div class="glow g2"></div>
