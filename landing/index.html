@@ -223,6 +223,13 @@ footer .wrap{display:grid;grid-template-columns:1.3fr 1fr;gap:40px}
 .go #fan .fp{stroke-dashoffset:0}.go #fan .fr{opacity:.18}.go #fan .fc{transform:scale(1)}.go #fan .fv{opacity:1}
 .go #fan .fv2{animation:pulse 2.4s 2s ease-out infinite}
 @keyframes pulse{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(2.2)}}
+
+.film{padding:10px 0 90px}.film .frame{position:relative;max-width:1080px;margin:0 auto;border:1px solid var(--line,#26263A);border-radius:22px;overflow:hidden;background:#0B0B14;box-shadow:0 0 0 1px rgba(198,255,61,.06),0 30px 120px -30px rgba(198,255,61,.25)}
+.film video{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#0B0B14}
+.film .snd{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:12px 20px;border-radius:999px;border:1px solid rgba(198,255,61,.5);background:rgba(11,11,20,.75);color:#F4F4F0;font:600 15px/1 inherit;cursor:pointer;backdrop-filter:blur(6px);transition:opacity .3s,transform .3s}
+.film .snd:hover{transform:translateX(-50%) scale(1.04)}.film .snd i{width:0;height:0;border-left:10px solid #C6FF3D;border-top:6px solid transparent;border-bottom:6px solid transparent}
+.film .snd.off{opacity:0;pointer-events:none}
+@media (max-width:640px){.film{padding:0 0 56px}.film .frame{border-radius:14px}.film .snd{bottom:12px;padding:9px 14px;font-size:13px}}
 /*MOBILE*/@media (max-width:640px){
 .herogrid>*,.fangrid>*,.grid2>*,.apply>*{min-width:0}
 body{font-size:16px}
@@ -331,6 +338,8 @@ footer{padding:40px 0 28px}
 <div class="chips rv d3"><span class="chip"><b>TikTok</b> + Reels</span><span class="chip"><b>100–500</b> creators</span><span class="chip"><b>90</b> days</span><span class="chip"><b>100%</b> refund guarantee</span></div></div>
 <div class="wall rv d2" aria-hidden="true"><div class="col"></div><div class="col"></div><div class="col"></div></div></div></header>
 
+<section class="film"><div class="wrap"><div class="frame rv"><video id="cfilm" autoplay muted loop playsinline preload="metadata" poster="/media/cadence-film-poster.jpg" aria-label="Cadence film"><source src="/media/cadence-film-540.mp4" type="video/mp4" media="(max-width:640px)"><source src="/media/cadence-film.mp4" type="video/mp4"></video><button class="snd" id="cfsnd" type="button"><i></i>Watch with sound</button></div></div></section>
+
 <section class="fan"><div class="wrap"><div class="sechead"><div class="eyebrow rv">How Cadence works</div><h2 class="split">An ad is one voice.<br><span class="hl">We give you hundreds.</span></h2><p class="lead rv d2">Each creator shows your product to their own audience. Together, they reach millions.</p></div>
 <div class="flow" id="flow">
 <div class="stage rv"><div class="sv prod"><div class="pbox"></div></div><div class="sl"><span class="sn">1</span><b>Your product</b><p>One package per creator, every month.</p></div></div>
@@ -416,4 +425,5 @@ if(fl){const st=fl.querySelectorAll('.stage');const vc=fl.querySelector('.vc');c
 document.querySelectorAll('.btn').forEach(b=>{b.addEventListener('pointermove',e=>{const r=b.getBoundingClientRect();b.style.transform=`translate(${(e.clientX-r.left-r.width/2)*.18}px,${(e.clientY-r.top-r.height/2)*.25}px)`});b.addEventListener('pointerleave',()=>b.style.transform='')});
 // form
 const f=document.querySelector('form');if(f){f.addEventListener('submit',async e=>{e.preventDefault();const b=f.querySelector('button[type=submit]');const t=b.textContent;b.disabled=true;b.textContent='…';const d=Object.fromEntries(new FormData(f).entries());d.lang=document.documentElement.lang;d.page=location.href;try{const r=await fetch('/api/apply',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(d)});if(!r.ok)throw 0;try{sessionStorage.setItem('cad_name',(d.name||'').split(' ')[0]);sessionStorage.setItem('cad_brand',d.brand||'')}catch(_){}location.href=(d.lang==='fr'?'/fr/call':'/call')+'?applied=1'}catch(_){b.disabled=false;b.textContent=t;f.querySelector('.ok').style.display='block';f.querySelector('.ok').textContent=(document.documentElement.lang==='fr'?"Un problème est survenu. Écrivez-nous à hello@cadenceinfluence.com":"Something went wrong. Email us at hello@cadenceinfluence.com")}})}
-</script></body></html>
+</script><script>(function(){var v=document.getElementById('cfilm'),b=document.getElementById('cfsnd');if(!v||!b)return;b.addEventListener('click',function(){v.loop=false;v.currentTime=0;v.muted=false;v.controls=true;v.play();b.classList.add('off')});v.addEventListener('ended',function(){v.muted=true;v.loop=true;v.controls=false;v.play();b.classList.remove('off')});})();</script>
+</body></html>
