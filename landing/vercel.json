@@ -12,6 +12,10 @@
     {
       "source": "/fr/deck",
       "destination": "/deck-fr"
+    },
+    {
+      "source": "/fr/mentions-legales",
+      "destination": "/mentions-legales"
     }
   ]
 }
